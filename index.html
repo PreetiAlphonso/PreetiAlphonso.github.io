@@ -12,7 +12,26 @@
         .nav-link:hover { color: #b45309; }
         .nav-link.active { color: #b45309; font-weight: 500; }
    @media (max-width: 768px) {
+nav > div {
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 12px;
+}
 
+nav > div > div:first-child {
+  font-size: 1.1rem;
+}
+
+nav > div > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+nav button, nav a {
+  font-size: 13px !important;
+  white-space: nowrap;
+}
   /* Navigation */
   nav {
     flex-wrap: wrap;
