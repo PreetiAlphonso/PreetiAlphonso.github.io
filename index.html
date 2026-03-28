@@ -11,6 +11,100 @@
         .nav-link { color: #57534e; transition: color 0.3s; }
         .nav-link:hover { color: #b45309; }
         .nav-link.active { color: #b45309; font-weight: 500; }
+   @media (max-width: 768px) {
+
+  /* Navigation */
+  nav {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px;
+  }
+  nav a {
+    font-size: 14px;
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+
+  /* Hero Section */
+  .hero h1, main h1 {
+    font-size: 2rem !important;
+    line-height: 1.2;
+    margin-bottom: 20px;
+  }
+  .hero h2, main h2 {
+    font-size: 1.3rem;
+    margin-bottom: 15px;
+  }
+  .hero p, main > p {
+    font-size: 1rem;
+    line-height: 1.6;
+    padding: 0 20px;
+  }
+
+  /* Stats Section */
+  .stats-container, .metrics-container {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+    padding: 30px 20px;
+  }
+  .stat-item, .metric-item {
+    width: 100%;
+    text-align: center;
+  }
+  .stat-number {
+    font-size: 2.5rem;
+  }
+
+  /* General Layout */
+  .container, section {
+    padding: 20px;
+  }
+
+  /* Buttons */
+  button, .cta-button {
+    min-height: 44px;
+    padding: 12px 20px;
+    font-size: 16px;
+  }
+
+  /* Case Studies Grid */
+  .case-studies-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  /* Chatbot — full screen on mobile */
+  .chat-window {
+    width: 100%;
+    height: 100vh;
+    max-width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+    bottom: 0;
+    right: 0;
+  }
+  .chat-button {
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+  }
+}
+
+/* Extra small phones */
+@media (max-width: 480px) {
+  .hero h1, main h1 {
+    font-size: 1.75rem !important;
+  }
+  nav a {
+    font-size: 13px;
+    padding: 6px 8px;
+  }
+  .stat-number {
+    font-size: 2rem;
+  }
+}
     </style>
 </head>
 <body class="min-h-screen bg-stone-50">
