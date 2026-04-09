@@ -12,11 +12,11 @@
     body { background: #fafaf9; font-family: system-ui, sans-serif; margin: 0; }
     .nav-link { color: #57534e; transition: color 0.3s; background: none; border: none; cursor: pointer; font-size: 14px; }
     .nav-link:hover, .nav-link.active { color: #b45309; }
-    @media (max-width: 768px) {
-  .cards-grid { grid-template-columns: 1fr !important; }
-  nav > div { flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 16px; }
-  nav > div > div:last-child { display: flex; flex-wrap: wrap; gap: 6px; }
-  nav > div > div:last-child a, nav > div > div:last-child button { font-size: 12px; }
+   @media (max-width: 768px) {
+  nav > div { flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px 16px; }
+  nav > div > div:last-child { display: flex; flex-wrap: wrap; gap: 4px; }
+  nav > div > div:last-child a, nav > div > div:last-child button { font-size: 11px; }
+  #root div[style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
 }
   </style>
 </head>
