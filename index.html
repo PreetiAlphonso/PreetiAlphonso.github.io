@@ -11,8 +11,21 @@
         .nav-link { color: #57534e; transition: color 0.3s; }
         .nav-link:hover { color: #b45309; }
         @media (max-width: 768px) {
-  nav > div { flex-wrap: wrap; gap: 4px; padding: 10px 16px; }
-  nav a, nav button { font-size: 11px !important; padding: 3px 5px !important; }
+  nav > div { 
+    flex-direction: column !important; 
+    align-items: flex-start !important; 
+    padding: 12px 16px !important; 
+    gap: 8px !important; 
+  }
+  nav > div > div { 
+    display: flex !important; 
+    flex-wrap: wrap !important; 
+    gap: 6px !important; 
+  }
+  nav a, nav button { 
+    font-size: 12px !important; 
+    padding: 4px 8px !important; 
+  }
 }
         .nav-link.active { color: #b45309; font-weight: 500; }
   .chat-widget {
