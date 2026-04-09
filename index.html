@@ -10,6 +10,10 @@
         .section.active { display: block; }
         .nav-link { color: #57534e; transition: color 0.3s; }
         .nav-link:hover { color: #b45309; }
+        @media (max-width: 768px) {
+  nav > div { flex-wrap: wrap; gap: 8px; padding: 12px; }
+  nav > div > div:last-child { flex-wrap: wrap; gap: 8px; }
+}
         .nav-link.active { color: #b45309; font-weight: 500; }
   .chat-widget {
  z-index: 9999 !important;
