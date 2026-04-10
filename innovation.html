@@ -4,6 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Innovation — Preeti Alphonso</title>
+  <style>
+    .innovation-intro { font-size: 15px; color: #78716c; line-height: 1.7; max-width: 560px; margin: 0 auto; }
+    .featured-desc { font-size: 15px; color: #57534e; line-height: 1.7; margin: 0 0 20px; }
+    @media (max-width: 768px) {
+      .innovation-intro { font-size: 14px; }
+      .featured-desc { font-size: 14px; }
+    }
+  </style>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -400,8 +408,8 @@ We look forward to an exceptional evening together.`;
           <div style={{ textAlign: "center", paddingBottom: 40, borderBottom: "1px solid #e7e5e4", marginBottom: 40 }}>
             <div style={{ fontSize: 12, letterSpacing: 3, color: "#b45309", textTransform: "uppercase", fontWeight: 600, marginBottom: 12 }}>Innovation</div>
             <h1 style={{ margin: "0 0 16px", fontSize: 32, fontWeight: 300, color: "#1c1917", letterSpacing: "-0.5px" }}>AI-Powered Experiments</h1>
-            <p style={{ margin: "0 auto", maxWidth: 560, color: "#78716c", lineHeight: 1.7, fontSize: 15 }}>
-              I don't just talk about AI — I build with it. Below is a live proof-of-concept demonstrating how agentic AI can transform marketing operations.
+            <p className="innovation-intro">
+              Field marketers wear every hat — strategist, producer, coordinator. Here's an AI engine I built to give some of those hats back.
             </p>
           </div>
 
@@ -416,8 +424,9 @@ We look forward to an exceptional evening together.`;
               <p style={{ margin: 0, color: "#78716c", fontSize: 14 }}>3-Agent AI document generation system</p>
             </div>
             <div style={{ padding: "28px 32px" }}>
-              <p style={{ margin: "0 0 20px", color: "#57534e", fontSize: 15, lineHeight: 1.7 }}>
-                Three AI agents collaborate to produce a full executive event operations suite — Run of Show, Guest Agenda, and Post-Event Survey — from a single form input. Agent 2 reviews the output and Agent 3 self-corrects any issues automatically.
+              <p className="featured-desc">
+                Run of Show in one doc. Guest Agenda in another thread. Post-Event Survey an afterthought.<br/><br/>
+                This 3-agent engine brings all three together — one input, three polished documents, in minutes. It doesn't replace your expertise — it gives you a strong starting point so you can focus on what matters most: the content, the relationships, the revenue.
               </p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 24 }} className="hero-grid">
                 {[["🤖 Agent 1","Drafts the full Run of Show"],["🔍 Agent 2","Reviews & flags issues"],["✅ Agent 3","Validates & self-corrects"]].map(([title, desc]) => (
