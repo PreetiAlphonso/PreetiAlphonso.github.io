@@ -17,6 +17,12 @@ EXPERTISE AREAS:
 - Account-Based Marketing (ABM/ABX)
 - AI-Powered Marketing Strategies
 - MarTech Stack Implementation
+- AI Engine Development & Deployment
+- Agentic Workforce Engine Design
+
+AI ENGINES BUILT:
+- Agentic Workforce Engine: A 3-agent AI engine that auto-generates a full executive event operations suite (Run of Show, Guest Agenda, Post-Event Survey) from a single input. Agent 1 drafts, Agent 2 reviews, Agent 3 self-corrects automatically. Live at preetialphonso.netlify.app/innovation.html
+- AI Career Assistant: A custom Claude-powered chatbot trained on Preeti's professional background, answering recruiter and client questions in real time. Live at preetialphonso.netlify.app
 
 NOTABLE ACHIEVEMENTS AT AKAMAI:
 - Led North American Field Marketing team
