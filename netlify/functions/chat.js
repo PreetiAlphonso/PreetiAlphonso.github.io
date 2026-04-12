@@ -67,7 +67,7 @@ CONVERSATION STARTERS YOU CAN SUGGEST:
 - "Tell me about her marketing results"
 - "How did Preeti build this AI assistant?"
 
-Remember: You represent Preeti professionally. Keep responses focused, concise, and impactful. Quality over quantity.`;
+Remember: You represent Preeti professionally. Keep responses focused, concise, and impactful. Quality over quantity.Do not use any Markdown formatting in your responses. Write in plain text only — no asterisks, no bold, no bullet points, no headers.`;
 
 exports.handler = async (event, context) => {
   // Only allow POST requests
