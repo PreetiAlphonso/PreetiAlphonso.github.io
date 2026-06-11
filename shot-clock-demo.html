@@ -579,8 +579,14 @@ function App() {
 
       {/* Row 1 — event name + date */}
       <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
-        <input value={eventName} onChange={e=>setEventName(e.target.value)} placeholder="Event name" style={{flex:2,minWidth:180}}/>
-        <input type="date" value={eventDate} onChange={e=>setEventDate(e.target.value)} style={{flex:1,minWidth:140}}/>
+        <div style={{flex:2,minWidth:180}}>
+          <label style={{fontSize:11,color:"var(--color-text-secondary)",display:"block",marginBottom:4,fontWeight:500}}>Event name</label>
+          <input value={eventName} onChange={e=>setEventName(e.target.value)} placeholder="e.g. East Coast Executive Summit" style={{width:"100%",boxSizing:"border-box"}}/>
+        </div>
+        <div style={{flex:1,minWidth:140}}>
+          <label style={{fontSize:11,color:"var(--color-text-secondary)",display:"block",marginBottom:4,fontWeight:500}}>Event date</label>
+          <input type="date" value={eventDate} onChange={e=>setEventDate(e.target.value)} style={{width:"100%",boxSizing:"border-box"}}/>
+        </div>
       </div>
 
       {/* FM role — shapes whether P1 strategy tasks are included */}
