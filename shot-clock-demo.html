@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FMMC — Engine 02: Shot Clock Agent</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --color-text-primary: #1a1a17;
+    --color-text-secondary: #6b6a64;
+    --color-text-tertiary: #9b9a93;
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f5f4ef;
+    --color-background-info: #e6f1fb;
+    --color-text-info: #185fa5;
+    --color-border-info: #185fa5;
+    --color-border-secondary: #c9c7bd;
+    --color-border-tertiary: #e0ded6;
+    --border-radius-md: 6px;
+    --border-radius-lg: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--color-background-primary); font-family: var(--font-sans); }
+  button { border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); border-radius: var(--border-radius-md); cursor: pointer; font-family: inherit; color: var(--color-text-primary); }
+  input, select, textarea { border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); padding: 6px 8px; font-family: inherit; font-size: 13px; color: var(--color-text-primary); background: var(--color-background-primary); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useEffect } = React;
+
+const MAIN_TASKS = [
+  { daysOut:120, phase:"P1", cluster:"Event Logistics", item:"Event kick off — define scope and objectives" },
+  { daysOut:120, phase:"P1", cluster:"Event Logistics", item:"Define roles and responsibilities from leadership" },
+  { daysOut:120, phase:"P1", cluster:"Event Logistics", item:"Create event planning deck" },
+  { daysOut:120, phase:"P1", cluster:"Content", item:"Workstream leaders assemble core teams" },
+  { daysOut:120, phase:"P1", cluster:"Event Logistics", item:"Leadership direction on goals, strategy and scope" },
+  { daysOut:120, phase:"P1", cluster:"Event Logistics", item:"Confirm event format and target regions" },
+  { daysOut:90, phase:"P1", cluster:"Budget", item:"Finalize estimated event budget" },
+  { daysOut:90, phase:"P1", cluster:"Event Logistics", item:"Obtain executive review and sign-off" },
+  { daysOut:90, phase:"P1", cluster:"Event Logistics", item:"Add event to global events calendar" },
+  { daysOut:90, phase:"P2", cluster:"Event Logistics", item:"Create CRM tactic" },
+  { daysOut:90, phase:"P2", cluster:"Content", item:"Develop strawman agenda" },
+  { daysOut:90, phase:"P2", cluster:"Content", item:"Determine language and interpretation needs" },
+  { daysOut:90, phase:"P2", cluster:"Event Logistics", item:"Open tickets for all creative assets and requests" },
+  { daysOut:90, phase:"P2", cluster:"Event Logistics", item:"Finalize KPIs" },
+  { daysOut:90, phase:"P2", cluster:"Platform & Tech", item:"Contract platform resources" },
+  { daysOut:90, phase:"P1", cluster:"Budget", item:"Finalize audience acquisition budget" },
+  { daysOut:90, phase:"P1", cluster:"Content", item:"Land messaging narrative" },
+  { daysOut:90, phase:"P2", cluster:"Content", item:"Confirm new and existing content strategy" },
+  { daysOut:90, phase:"P2", cluster:"Event Logistics", item:"Obtain executive calendar availability" },
+  { daysOut:90, phase:"P2", cluster:"Promotion", item:"Develop promotion calendar" },
+  { daysOut:90, phase:"P2", cluster:"Event Logistics", item:"Venue search initiated" },
+  { daysOut:90, phase:"P3", cluster:"Branding", item:"Meeting: discuss branding and creative deliverables" },
+  { daysOut:75, phase:"P2", cluster:"Event Logistics", item:"Hook confirmed — keynote speaker or experience" },
+  { daysOut:75, phase:"P2", cluster:"Event Logistics", item:"Venue requirements brief sent to shortlisted venues" },
+  { daysOut:60, phase:"P2", cluster:"Event Logistics", item:"Submit COI request to insurance carrier" },
+  { daysOut:60, phase:"P2", cluster:"Event Logistics", item:"Venue shortlisted — two options in review" },
+  { daysOut:45, phase:"P5", cluster:"Event Logistics", item:"Speaker save the date — hosts, speakers, execs" },
+  { daysOut:45, phase:"P5", cluster:"Event Logistics", item:"Confirm speaker outlines, talking points and timing" },
+  { daysOut:45, phase:"P5", cluster:"Promotion", item:"Publish blog post 1 — announcement" },
+  { daysOut:45, phase:"P5", cluster:"Content", item:"Prepare all session content" },
+  { daysOut:45, phase:"P4", cluster:"Branding", item:"Develop speaker PPT template" },
+  { daysOut:45, phase:"P5", cluster:"Promotion", item:"Implement all email copy and design" },
+  { daysOut:45, phase:"P3", cluster:"Branding", item:"Review SWAG needs — badges, lanyards, giveaways" },
+  { daysOut:45, phase:"P4", cluster:"Branding", item:"Develop branded video bumpers" },
+  { daysOut:45, phase:"P4", cluster:"Content", item:"Confirm keynote speakers" },
+  { daysOut:45, phase:"P4", cluster:"Content", item:"Source and confirm all speakers" },
+  { daysOut:45, phase:"P4", cluster:"Content", item:"Source customer speakers" },
+  { daysOut:45, phase:"P2", cluster:"Event Logistics", item:"COI received from carrier — review vs venue requirements" },
+  { daysOut:40, phase:"P5", cluster:"Promotion", item:"Develop and publish website blog post" },
+  { daysOut:36, phase:"P5", cluster:"Promotion", item:"Distribute invite number 1" },
+  { daysOut:35, phase:"P3", cluster:"Platform & Tech", item:"Develop registration page with logos and speakers" },
+  { daysOut:35, phase:"P5", cluster:"Promotion", item:"Review and localize all email copy and design" },
+  { daysOut:35, phase:"P3", cluster:"Branding", item:"Finalize SWAG needs" },
+  { daysOut:35, phase:"P5", cluster:"Event Logistics", item:"Rehearsal invite: hosts and speakers" },
+  { daysOut:30, phase:"P2", cluster:"Event Logistics", item:"Submit COI to venue — request confirmation of receipt" },
+  { daysOut:30, phase:"P2", cluster:"Event Logistics", item:"Collect vendor COIs from all on-site vendors" },
+  { daysOut:29, phase:"P3", cluster:"Platform & Tech", item:"Launch registration page" },
+  { daysOut:21, phase:"P5", cluster:"Event Logistics", item:"Confirm all COIs approved by venue — hard flag if not" },
+  { daysOut:21, phase:"P5", cluster:"Event Logistics", item:"Develop executive overview document" },
+  { daysOut:21, phase:"P5", cluster:"Event Logistics", item:"Develop host document" },
+  { daysOut:21, phase:"P5", cluster:"Promotion", item:"Publish blog post 2 — event happenings" },
+  { daysOut:20, phase:"P5", cluster:"Event Logistics", item:"Confirm event staff" },
+  { daysOut:15, phase:"P5", cluster:"Promotion", item:"Distribute invite number 2" },
+  { daysOut:15, phase:"P5", cluster:"Promotion", item:"Distribute invite number 3" },
+  { daysOut:14, phase:"P5", cluster:"Content", item:"Develop Q&A questions for moderators" },
+  { daysOut:14, phase:"P5", cluster:"Event Logistics", item:"Develop staff document" },
+  { daysOut:14, phase:"P6", cluster:"Event Logistics", item:"Tech check: virtual presenters" },
+  { daysOut:14, phase:"P5", cluster:"Event Logistics", item:"Develop event run of show" },
+  { daysOut:12, phase:"P5", cluster:"Event Logistics", item:"Develop event survey" },
+  { daysOut:8,  phase:"P5", cluster:"Event Logistics", item:"Review event survey" },
+  { daysOut:8,  phase:"P5", cluster:"Promotion", item:"Distribute reminder email" },
+  { daysOut:7,  phase:"P5", cluster:"Event Logistics", item:"COI final status check — print physical copy" },
+  { daysOut:7,  phase:"P5", cluster:"Event Logistics", item:"F&B final guarantees submitted" },
+  { daysOut:7,  phase:"P5", cluster:"Event Logistics", item:"Meeting: host prep" },
+  { daysOut:7,  phase:"P5", cluster:"Event Logistics", item:"Meeting: staff prep and registration training" },
+  { daysOut:7,  phase:"P5", cluster:"Event Logistics", item:"Meeting: run of show review" },
+  { daysOut:7,  phase:"P5", cluster:"Content", item:"Final sign-off of all presentations" },
+  { daysOut:5,  phase:"P5", cluster:"Event Logistics", item:"FM team working session — workstation assignments" },
+  { daysOut:5,  phase:"P5", cluster:"Event Logistics", item:"Implement event survey" },
+  { daysOut:5,  phase:"P6", cluster:"Event Logistics", item:"Booth and staff meeting" },
+  { daysOut:3,  phase:"P5", cluster:"Event Logistics", item:"Sales and SC etiquette session" },
+  { daysOut:1,  phase:"P6", cluster:"Event Logistics", item:"Night prior: AV load-in and setup" },
+  { daysOut:1,  phase:"P6", cluster:"Event Logistics", item:"Night prior: dry run and tech check" },
+  { daysOut:1,  phase:"P6", cluster:"Event Logistics", item:"Night prior: ROS constituent meetings" },
+  { daysOut:1,  phase:"P6", cluster:"Event Logistics", item:"Night prior: slide lock — no changes after this point" },
+  { daysOut:0,  phase:"P6", cluster:"Event Logistics", item:"EVENT DAY — FM Lead in command mode" },
+  { daysOut:-1, phase:"P7", cluster:"Post Event", item:"List and lead uploads" },
+  { daysOut:-1, phase:"P7", cluster:"Post Event", item:"Publish post-event summary" },
+  { daysOut:-7, phase:"P7", cluster:"Post Event", item:"Meeting: event debrief" },
+  { daysOut:-7, phase:"P7", cluster:"Promotion", item:"Distribute thank you and survey emails" },
+  { daysOut:-30, phase:"P7", cluster:"Post Event", item:"Track KPIs — month 1" },
+  { daysOut:-60, phase:"P7", cluster:"Post Event", item:"Track KPIs — month 2" },
+  { daysOut:-90, phase:"P7", cluster:"Post Event", item:"Track KPIs — month 3" },
+  { daysOut:-180, phase:"P7", cluster:"Post Event", item:"Track ROI" },
+];
+
+const ANCHOR_TASKS = [
+  { daysOut:60, phase:"P1", cluster:"Event Logistics", item:"Confirm team attendance at anchor event — who is going?" },
+  { daysOut:60, phase:"P1", cluster:"Event Logistics", item:"Register team for anchor event — conference passes" },
+  { daysOut:60, phase:"P1", cluster:"Event Logistics", item:"Book hotel near anchor venue — fills up fast" },
+  { daysOut:60, phase:"P1", cluster:"Budget", item:"Finalize activation budget — dinner, meetings, hospitality" },
+  { daysOut:60, phase:"P1", cluster:"Event Logistics", item:"Book restaurant or private room for activation" },
+  { daysOut:45, phase:"P2", cluster:"Event Logistics", item:"Build target guest list — who from our accounts is attending?" },
+  { daysOut:45, phase:"P2", cluster:"Event Logistics", item:"Confirm exec presence — which exec is attending anchor event?" },
+  { daysOut:45, phase:"P2", cluster:"Event Logistics", item:"Competitor intel — what other activations are happening that week?" },
+  { daysOut:45, phase:"P2", cluster:"Content", item:"Develop activation talking points and key messages" },
+  { daysOut:45, phase:"P2", cluster:"Promotion", item:"Draft activation invitations — personalized per guest" },
+  { daysOut:30, phase:"P3", cluster:"Event Logistics", item:"Guest list confirmed — RSVPs tracked" },
+  { daysOut:30, phase:"P3", cluster:"Promotion", item:"Invitations sent to target guest list" },
+  { daysOut:30, phase:"P3", cluster:"Event Logistics", item:"1:1 meeting slots open for booking" },
+  { daysOut:30, phase:"P3", cluster:"Event Logistics", item:"Restaurant or venue COI if required" },
+  { daysOut:30, phase:"P3", cluster:"Event Logistics", item:"Shipping to hotel arranged — gifts, materials" },
+  { daysOut:14, phase:"P5", cluster:"Event Logistics", item:"Final guest list locked — seating plan if dinner" },
+  { daysOut:14, phase:"P5", cluster:"Event Logistics", item:"Restaurant briefed on dietary requirements" },
+  { daysOut:14, phase:"P5", cluster:"Event Logistics", item:"Team briefed on attending guests and their priorities" },
+  { daysOut:14, phase:"P5", cluster:"Event Logistics", item:"1:1 meeting schedule finalized and confirmed" },
+  { daysOut:7,  phase:"P5", cluster:"Event Logistics", item:"F&B final guarantee submitted to restaurant" },
+  { daysOut:7,  phase:"P5", cluster:"Event Logistics", item:"Executive briefed on key accounts attending" },
+  { daysOut:7,  phase:"P5", cluster:"Event Logistics", item:"Team briefing — conversation goals and listening priorities" },
+  { daysOut:7,  phase:"P5", cluster:"Event Logistics", item:"Confirm all materials received at hotel" },
+  { daysOut:1,  phase:"P6", cluster:"Event Logistics", item:"Night prior: venue walk and setup check" },
+  { daysOut:1,  phase:"P6", cluster:"Event Logistics", item:"Night prior: team alignment meeting" },
+  { daysOut:0,  phase:"P6", cluster:"Event Logistics", item:"ACTIVATION DAY — FM Lead manages program" },
+  { daysOut:-1, phase:"P7", cluster:"Post Event", item:"Follow-up actions logged — who to contact and when" },
+  { daysOut:-1, phase:"P7", cluster:"Post Event", item:"CRM updated — contacts, notes, opportunities flagged" },
+  { daysOut:-7, phase:"P7", cluster:"Post Event", item:"Meeting: activation debrief" },
+  { daysOut:-7, phase:"P7", cluster:"Promotion", item:"Thank you notes sent to dinner and meeting guests" },
+  { daysOut:-30, phase:"P7", cluster:"Post Event", item:"Track activation KPIs — meetings held, pipeline influenced" },
+];
+
+const PHASE_META = {
+  P1:{ label:"Budget/Strategy", color:"#185FA5" },
+  P2:{ label:"Event Framework", color:"#0F6E56" },
+  P3:{ label:"Initial Planning", color:"#993C1D" },
+  P4:{ label:"Content Lock", color:"#3C3489" },
+  P5:{ label:"Pre-Event", color:"#993556" },
+  P6:{ label:"Execution", color:"#3B6D11" },
+  P7:{ label:"Post-Event", color:"#5F5E5A" },
+};
+
+const CLUSTERS = ["All","Event Logistics","Content","Branding","Promotion","Platform & Tech","Budget","Post Event"];
+const CLUSTER_COLOR = {
+  "Event Logistics":"#185FA5","Content":"#0F6E56","Branding":"#993C1D",
+  "Promotion":"#993556","Platform & Tech":"#3C3489","Budget":"#3B6D11","Post Event":"#5F5E5A",
+};
+
+const VENUE_TYPES = ["Conference center","Hotel","Restaurant / private dining","Rooftop / outdoor","Museum / gallery","Webinar platform","Hybrid","Corporate office","Other"];
+const VENDOR_ROLES = ["AV & production","Catering / F&B","SWAG & merchandise","Photography & videography","Translation & interpretation","Registration platform","Stage & set design","Lighting","Security","Transportation","Floral & decor","Entertainment / speaker bureau","Printing & signage","Badge printing","Staffing agency","Other"];
+const VENDOR_DELIVERABLES = {
+  "AV & production":["AV spec sheet submitted","Equipment list confirmed","Load-in time confirmed","Tech rehearsal scheduled","Mic check completed","Recording setup confirmed","Strike time confirmed"],
+  "Catering / F&B":["Menu confirmed","Dietary requirements submitted","F&B guarantee submitted","Setup time confirmed","Service timeline agreed","Breakdown time confirmed"],
+  "SWAG & merchandise":["Order placed","Artwork approved","Production complete","Shipping arranged","Tracking number provided","Delivery confirmed","Storage location confirmed"],
+  "Photography & videography":["Shot list submitted","Schedule confirmed","Load-in agreed","Equipment list to venue","Deliverables timeline agreed","Post-event files delivered"],
+  "Translation & interpretation":["Language pairs confirmed","Equipment submitted","Interpreter schedule confirmed","Files submitted","Translations approved"],
+  "Registration platform":["Platform configured","Registration page live","Test registrations completed","Badge data uploaded","Check-in tested","Day-of support confirmed"],
+  "Stage & set design":["Design approved","Build schedule confirmed","Venue approved design","Load-in confirmed","Strike plan confirmed"],
+  "Lighting":["Design approved","Equipment list to venue","Load-in confirmed","Rehearsal scheduled"],
+  "Security":["Headcount confirmed","Post assignments agreed","Briefing scheduled","Emergency protocol shared"],
+  "Transportation":["Route confirmed","Vehicle count confirmed","Schedule finalized","Driver briefing complete"],
+  "Floral & decor":["Design approved","Delivery confirmed","Setup location confirmed","Breakdown agreed"],
+  "Entertainment / speaker bureau":["Contract signed","Speaker brief sent","Travel arranged","Hotel confirmed","AV requirements submitted","Run-through scheduled"],
+  "Printing & signage":["Artwork submitted","Proofs approved","Production complete","Delivery confirmed","Placement map shared"],
+  "Badge printing":["Attendee list submitted","Badge design approved","Test print completed","Printer on-site confirmed","Reprint protocol agreed"],
+  "Staffing agency":["Headcount confirmed","Roles briefed","Dress code confirmed","Call time confirmed","Escalation protocol shared"],
+  "Other":["Requirements submitted","Timeline agreed","Deliverables confirmed"],
+};
+
+const SATELLITE_TYPES = [
+  { id:"cab", label:"Customer Advisory Board (CAB)", icon:"CAB", desc:"Dedicated presentations, dinner, Chatham House rules" },
+  { id:"exec_dinner", label:"Executive dinner", icon:"EX", desc:"Invitation only, curated seating, night before or evening" },
+  { id:"partner_breakfast", label:"Partner kick-off / breakfast", icon:"PT", desc:"Partners only, pre-briefing before main doors open" },
+  { id:"speaker_dinner", label:"Speaker / VIP dinner", icon:"SP", desc:"Speakers, execs, top accounts — private and curated" },
+  { id:"press_briefing", label:"Press / analyst briefings", icon:"PR", desc:"Back-to-back 30-min sessions, day before or after" },
+  { id:"internal_dinner", label:"Internal team dinner", icon:"IN", desc:"FM and extended team — recognition and alignment" },
+  { id:"sponsor_activation", label:"Sponsor activation", icon:"SO", desc:"Sponsor-specific programming running in parallel" },
+  { id:"custom", label:"Custom satellite event", icon:"CS", desc:"Define your own satellite event type" },
+];
+
+const ANCHOR_ACTIVATION_TYPES = ["Private dinner","Breakfast briefing","1:1 meeting program","Drinks reception","Hospitality suite","Roundtable","Custom"];
+
+const EMAIL_CADENCE_OPTIONS = [
+  { weeks:12, label:"12 weeks", desc:"Major flagship — keynote announced early" },
+  { weeks:10, label:"10 weeks", desc:"Standard summit or large event" },
+  { weeks:8,  label:"8 weeks",  desc:"Regional event or roadshow stop" },
+  { weeks:6,  label:"6 weeks",  desc:"Focused dinner or smaller roadshow" },
+  { weeks:4,  label:"4 weeks",  desc:"Webinar, virtual or CAB" },
+  { weeks:3,  label:"3 weeks",  desc:"ABM dinner — personal curated invite" },
+  { weeks:-1, label:"Custom",   desc:"Set your own number of weeks" },
+];
+
+const RECOMMENDED_WEEKS = { main:8, anchor:6, satellite:4 };
+
+function statusStyle(s) {
+  if (s==="overdue") return { bg:"#FCEBEB", text:"#A32D2D", label:"Overdue" };
+  if (s==="today")   return { bg:"#FAEEDA", text:"#854F0B", label:"Today" };
+  if (s==="soon")    return { bg:"#EAF3DE", text:"#3B6D11", label:"Due soon" };
+  return { bg:"#F1EFE8", text:"#5F5E5A", label:"Upcoming" };
+}
+function getStatus(diff, daysOut) {
+  if (daysOut===0) return "today";
+  if (diff<0) return "overdue";
+  if (diff<=14) return "soon";
+  return "upcoming";
+}
+
+// ── Demo-mode agent outputs (zero API cost — same pattern as Release 1) ──
+const DEMO_DELAY = 900;
+const demoTaskOutput = (type, item, eventName, eventDate, venueName) => {
+  if (type==="draft") return `• Confirm scope and a single owner for "${item}" — log the decision in the event tracker by end of week.\n• Pull the relevant stakeholders (FM Lead, workstream owner${venueName?", venue contact":""}) into a 20-minute working session to align on deliverables and deadline.\n• Publish the outcome to the core team channel and mark this task complete in the shot clock once sign-off is received.`;
+  if (type==="raci") return `R: Field Marketing Manager\nA: FM Lead\nC: Digital team, Content owner, Vendor contacts (as applicable)\nI: Sales leadership, Core event team`;
+  return `Subject: Action needed — ${item}\n\nHi team,\n\nAs part of our preparation for ${eventName||"our upcoming event"}${eventDate?` on ${eventDate}`:""}, we're at the stage where "${item}" needs to be locked. Could the responsible owner confirm status and flag any blockers by end of day Friday?\n\nA quick reply with status (on track / at risk / blocked) is all we need.\n\nThank you,\nFM Lead`;
+};
+const demoGlobalOutput = (type, eventName, eventDate, venueName, vendorNames) => {
+  if (type==="ros") return `RUN OF SHOW — ${eventName||"Event"}${eventDate?` (${eventDate})`:""}${venueName?`\nVenue: ${venueName}`:""}\n\n07:00  Staff arrival, workstation assignments, radio check\n08:00  Registration opens — badge desk staffed\n09:00  Welcome & opening remarks (Host, 10 min)\n09:15  Keynote session (40 min + 5 min Q&A)\n10:00  Networking break — sponsor area open (30 min)\n10:30  Breakout sessions, round 1 (45 min)\n11:30  Customer panel (40 min)\n12:15  Lunch — exec hosted tables (60 min)\n13:30  Breakout sessions, round 2 (45 min)\n14:30  Closing keynote (30 min)\n15:00  Wrap, survey push, farewell gifts at exits\n15:30  Strike begins — vendor load-out per dock schedule${vendorNames?`\n\nVendors on site: ${vendorNames}`:""}\n\nNote: slide lock was the night prior. FM Lead owns zero tasks today — command mode only.`;
+  if (type==="deps") return `Top 5 critical-path dependencies\n\n1. Venue contract signed → before → COI submission to carrier. Insurance cannot be requested without a contracted venue.\n2. Keynote speaker confirmed → before → registration page launch. The hook drives sign-ups; launching without it wastes the first invite.\n3. Final agenda locked → before → email invite #2. Content details in the invite depend on a stable agenda.\n4. Registration platform configured → before → invite #1 distribution. Every invite must land on a working page.\n5. F&B final guarantee → before → day -7. Most venues hard-lock catering counts one week out; missing it means paying for the estimate.`;
+  return `EXECUTIVE BRIEF — ${eventName||"Event"}${eventDate?` · ${eventDate}`:""}\n\nPurpose: Deepen relationships with priority accounts and accelerate active pipeline through an in-person experience.\nGoals: 150 registrations, 90 attendees, 25 meaningful exec conversations, measurable pipeline influence within 90 days.\nAudience: Senior decision-makers from target and customer accounts in region.\nFormat: Half-day program — keynote, customer panel, breakouts, hosted lunch.${venueName?`\nVenue: ${venueName}.`:""}\nKey milestones: Venue locked, speakers confirmed, registration live, ROS rehearsal complete.\nRisks: Speaker availability (backup identified), registration pacing (weekly review), venue cancellation deadline (tracked in Go/No-Go panel).\nLeadership asks: Confirm exec attendance, host a lunch table, amplify the invite to your network.`;
+};
+const demoVendorOutput = (v, eventName, eventDate, vmLine) => {
+  const dels = (v.deliverables&&v.deliverables.length) ? v.deliverables.map(d=>`• ${d}`).join("\n") : "• Deliverables to be confirmed";
+  return `Dear ${v.contactName||"team"},\n\nAhead of ${eventName||"our event"}${eventDate?` on ${eventDate}`:""}, this briefing confirms the scope for ${v.name} as our ${v.role} partner.\n\nConfirmed deliverables:\n${dels}\n\nEvent-day timing and access details will follow in the logistics pack. The FM Lead is your single point of escalation for anything urgent.${vmLine?"\n\n"+vmLine:""}${v.customNote?"\n\nNotes: "+v.customNote:""}\n\nPlease confirm receipt of this briefing and flag any gaps by return email.\n\nBest regards,\nFM Lead`;
+};
+
+const Inp = ({label, val, onChange, placeholder="", type="text"}) => (
+  <div style={{marginBottom:10}}>
+    <label style={{fontSize:11,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>{label}</label>
+    <input type={type} value={val} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{width:"100%",boxSizing:"border-box",fontSize:13}}/>
+  </div>
+);
+
+const EMPTY_VENDOR = {id:null,name:"",role:"",contactName:"",contactPhone:"",contactEmail:"",shareVenueManager:false,deliverables:[],customNote:""};
+const STORAGE_KEY = "shotclock_v18_state";
+
+function App() {
+  const [eventName, setEventName] = useState("");
+  const [eventDate, setEventDate] = useState("");
+  const [eventType, setEventType] = useState("main");
+  const [fmRole, setFmRole] = useState("full"); // "full" = strategy + execution, "execution" = execution only (P1 excluded)
+  const [firstEmailWeeks, setFirstEmailWeeks] = useState(8);
+  const [customWeeks, setCustomWeeks] = useState("");
+  const [satellites, setSatellites] = useState([]);
+  const [activeSatellite, setActiveSatellite] = useState(null);
+  const [anchorEventName, setAnchorEventName] = useState("");
+  const [anchorActivationType, setAnchorActivationType] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [generated, setGenerated] = useState(false);
+  const [activePhase, setActivePhase] = useState("All");
+  const [activeCluster, setActiveCluster] = useState("All");
+  const [taskLoading, setTaskLoading] = useState({});
+  const [taskOutputs, setTaskOutputs] = useState({});
+  const [expandedTask, setExpandedTask] = useState({});
+  const [globalLoading, setGlobalLoading] = useState(null);
+  const [globalOutput, setGlobalOutput] = useState("");
+  const [showVenue, setShowVenue] = useState(false);
+  const [showVendors, setShowVendors] = useState(false);
+  const [editingVendor, setEditingVendor] = useState(null);
+  const [vendors, setVendors] = useState([]);
+  const [expandedVendor, setExpandedVendor] = useState(null);
+  const [vendorOutputs, setVendorOutputs] = useState({});
+  const [vendorLoading, setVendorLoading] = useState({});
+  const [venue, setVenue] = useState({
+    type:"",name:"",address:"",
+    managerName:"",managerTitle:"",managerPhone:"",managerEmail:"",
+    backupName:"",backupPhone:"",backupEmail:"",
+    loadingDockHours:"",wifiPassword:"",parkingNotes:"",emergencyLine:"",
+    cancellationDeadline:"",
+  });
+
+  const [goNoGoEnabled, setGoNoGoEnabled] = useState(false);
+  const [goNoGoDate, setGoNoGoDate] = useState("");
+
+  const [skippedEmails, setSkippedEmails] = useState({});
+  const [menuOpenEmail, setMenuOpenEmail] = useState(null);
+  const [emailDateOverrides, setEmailDateOverrides] = useState({});
+
+  const [hiddenTasks, setHiddenTasks] = useState({});
+  const [menuOpenTask, setMenuOpenTask] = useState(null);
+  const [showHiddenTasks, setShowHiddenTasks] = useState(false);
+  const [taskEdits, setTaskEdits] = useState({});
+  const [editingTask, setEditingTask] = useState(null);
+  const [editForm, setEditForm] = useState({name:"",daysOut:""});
+
+  const [customTasks, setCustomTasks] = useState([]);
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [newTask, setNewTask] = useState({name:"",daysOut:"",phase:"P5",cluster:"Event Logistics"});
+
+  const [loaded, setLoaded] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("");
+
+  // Load saved state on mount (browser localStorage)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.eventName !== undefined) setEventName(s.eventName);
+        if (s.eventDate !== undefined) setEventDate(s.eventDate);
+        if (s.eventType !== undefined) setEventType(s.eventType);
+        if (s.fmRole !== undefined) setFmRole(s.fmRole);
+        if (s.firstEmailWeeks !== undefined) setFirstEmailWeeks(s.firstEmailWeeks);
+        if (s.customWeeks !== undefined) setCustomWeeks(s.customWeeks);
+        if (s.satellites !== undefined) setSatellites(s.satellites);
+        if (s.anchorEventName !== undefined) setAnchorEventName(s.anchorEventName);
+        if (s.anchorActivationType !== undefined) setAnchorActivationType(s.anchorActivationType);
+        if (s.venue !== undefined) setVenue(s.venue);
+        if (s.vendors !== undefined) setVendors(s.vendors);
+        if (s.goNoGoEnabled !== undefined) setGoNoGoEnabled(s.goNoGoEnabled);
+        if (s.goNoGoDate !== undefined) setGoNoGoDate(s.goNoGoDate);
+        if (s.skippedEmails !== undefined) setSkippedEmails(s.skippedEmails);
+        if (s.emailDateOverrides !== undefined) setEmailDateOverrides(s.emailDateOverrides);
+        if (s.hiddenTasks !== undefined) setHiddenTasks(s.hiddenTasks);
+        if (s.taskEdits !== undefined) setTaskEdits(s.taskEdits);
+        if (s.customTasks !== undefined) setCustomTasks(s.customTasks);
+        if (s.taskOutputs !== undefined) setTaskOutputs(s.taskOutputs);
+        if (s.vendorOutputs !== undefined) setVendorOutputs(s.vendorOutputs);
+      }
+    } catch (err) {
+      // No saved state yet — that's fine
+    }
+    setLoaded(true);
+  }, []);
+
+  // Save state whenever key data changes (debounced)
+  useEffect(() => {
+    if (!loaded) return;
+    const timer = setTimeout(() => {
+      try {
+        setSaveStatus("saving");
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          eventName, eventDate, eventType, fmRole, firstEmailWeeks, customWeeks,
+          satellites, anchorEventName, anchorActivationType,
+          venue, vendors, goNoGoEnabled, goNoGoDate,
+          skippedEmails, emailDateOverrides, hiddenTasks, taskEdits, customTasks, taskOutputs, vendorOutputs,
+        }));
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus(""), 2000);
+      } catch (err) {
+        setSaveStatus("error");
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [loaded, eventName, eventDate, eventType, fmRole, firstEmailWeeks, customWeeks,
+      satellites, anchorEventName, anchorActivationType,
+      venue, vendors, goNoGoEnabled, goNoGoDate,
+      skippedEmails, emailDateOverrides, hiddenTasks, taskEdits, customTasks, taskOutputs, vendorOutputs]);
+
+  // Clear all saved data — two-step inline confirm
+  const [confirmClear, setConfirmClear] = useState(false);
+  const clearSavedData = () => {
+    if (!confirmClear) {
+      setConfirmClear(true);
+      setTimeout(() => setConfirmClear(false), 4000);
+      return;
+    }
+    setConfirmClear(false);
+    try { localStorage.removeItem(STORAGE_KEY); } catch (err) {}
+    setEventName(""); setEventDate(""); setEventType("main"); setFmRole("full");
+    setFirstEmailWeeks(8); setCustomWeeks(""); setSatellites([]);
+    setAnchorEventName(""); setAnchorActivationType([]);
+    setVenue({type:"",name:"",address:"",managerName:"",managerTitle:"",managerPhone:"",managerEmail:"",backupName:"",backupPhone:"",backupEmail:"",loadingDockHours:"",wifiPassword:"",parkingNotes:"",emergencyLine:"",cancellationDeadline:""});
+    setVendors([]); setGoNoGoEnabled(false); setGoNoGoDate("");
+    setSkippedEmails({}); setEmailDateOverrides({}); setHiddenTasks({}); setTaskEdits({}); setCustomTasks([]);
+    setTaskOutputs({}); setVendorOutputs({});
+    setTasks([]); setGenerated(false);
+  };
+
+  const recWeeks = RECOMMENDED_WEEKS[eventType] || 8;
+  const effectiveWeeks = firstEmailWeeks===-1 ? (parseInt(customWeeks)||8) : firstEmailWeeks;
+
+  const getEmailCalendar = () => {
+    if (!eventDate) return [];
+    const ev = new Date(eventDate+"T12:00:00");
+    const w = effectiveWeeks;
+    const slots = [
+      { id:"save_date",    label:"Save the date",        weeksOut:w },
+      { id:"invite_1",     label:"Invite #1",            weeksOut:Math.max(w-2,2) },
+      { id:"invite_2",     label:"Invite #2",            weeksOut:Math.max(w-4,2) },
+      { id:"invite_3",     label:"Invite #3",            weeksOut:Math.max(Math.round(w/3),1) },
+      { id:"reminder_1",   label:"Reminder #1",          weeksOut:1 },
+      { id:"reminder_2",   label:"Reminder #2",          weeksOut:0.29 },
+      { id:"day_before",   label:"Day-before email",     weeksOut:0.14 },
+      { id:"day_of",       label:"Day-of email",         weeksOut:0 },
+      { id:"thank_you",    label:"Thank you — attended", weeksOut:-0.14 },
+      { id:"missed_you",   label:"Sorry we missed you",  weeksOut:-0.14 },
+      { id:"decks",        label:"Presentation decks",   weeksOut:-0.43 },
+      { id:"nurture",      label:"Follow-up nurture",    weeksOut:-1 },
+    ];
+    return slots.map(s => {
+      const d = new Date(ev);
+      d.setDate(ev.getDate() - Math.round(s.weeksOut * 7));
+      const override = emailDateOverrides[s.id];
+      const finalDateObj = override ? new Date(override+"T12:00:00") : d;
+      return {
+        ...s,
+        date: finalDateObj.toLocaleDateString("en-US",{month:"short",day:"numeric"}),
+        dateObj: finalDateObj,
+        dateIso: finalDateObj.toISOString().slice(0,10),
+        isOverridden: !!override,
+        isWeekend: finalDateObj.getDay() === 0 || finalDateObj.getDay() === 6,
+      };
+    });
+  };
+
+  const toggleActivationType = t => setAnchorActivationType(p => p.includes(t)?p.filter(x=>x!==t):[...p,t]);
+  const addSatellite = () => { const n={id:Date.now(),type:"",name:"",date:"",customType:""}; setSatellites(p=>[...p,n]); setActiveSatellite(n.id); };
+  const updateSatellite = (id,f,v) => setSatellites(p=>p.map(s=>s.id===id?{...s,[f]:v}:s));
+  const removeSatellite = id => { setSatellites(p=>p.filter(s=>s.id!==id)); if(activeSatellite===id) setActiveSatellite(null); };
+
+  const toggleSkipEmail = id => {
+    setSkippedEmails(p => ({ ...p, [id]: !p[id] }));
+    setMenuOpenEmail(null);
+  };
+
+  const toggleHideTask = id => {
+    setHiddenTasks(p => ({ ...p, [id]: !p[id] }));
+    setMenuOpenTask(null);
+  };
+
+  const saveCustomTask = () => {
+    if (!newTask.name.trim() || newTask.daysOut === "" || !eventDate) return;
+    const ev = new Date(eventDate+"T12:00:00");
+    const today = new Date(); today.setHours(0,0,0,0);
+    const daysOut = parseInt(newTask.daysOut);
+    const due = new Date(ev); due.setDate(ev.getDate()-daysOut);
+    const diff = Math.ceil((due-today)/86400000);
+    const custom = {
+      id: `custom-${Date.now()}`,
+      daysOut,
+      phase: newTask.phase,
+      cluster: newTask.cluster,
+      item: newTask.name.trim(),
+      due: due.toLocaleDateString("en-US",{month:"short",day:"numeric"}),
+      diff,
+      dueDateObj: due,
+      isCustom: true,
+    };
+    setCustomTasks(p => [...p, custom]);
+    setTasks(p => [...p, custom]);
+    setNewTask({name:"",daysOut:"",phase:"P5",cluster:"Event Logistics"});
+    setShowAddTask(false);
+  };
+
+  const generate = () => {
+    if (!eventDate) return;
+    const ev = new Date(eventDate+"T12:00:00");
+    const today = new Date(); today.setHours(0,0,0,0);
+    const src = eventType==="anchor" ? ANCHOR_TASKS : MAIN_TASKS;
+    const built = src.map((t,i)=>{
+      const due = new Date(ev); due.setDate(ev.getDate()-t.daysOut);
+      const diff = Math.ceil((due-today)/86400000);
+      return {...t,id:i,due:due.toLocaleDateString("en-US",{month:"short",day:"numeric"}),diff,dueDateObj:due};
+    });
+    const refreshedCustom = customTasks.map(c => {
+      const due = new Date(ev); due.setDate(ev.getDate()-c.daysOut);
+      const diff = Math.ceil((due-today)/86400000);
+      return {...c, due:due.toLocaleDateString("en-US",{month:"short",day:"numeric"}), diff, dueDateObj:due};
+    });
+    setTasks([...built, ...refreshedCustom]); setGenerated(true);
+  };
+
+  // Apply FM edits live (name/timing overrides recompute due date + status)
+  const effectiveTasks = useMemo(()=>{
+    if(!eventDate) return tasks;
+    const ev = new Date(eventDate+"T12:00:00");
+    const today = new Date(); today.setHours(0,0,0,0);
+    return tasks.map(t=>{
+      const e = taskEdits[t.id];
+      if(!e) return t;
+      const daysOut = e.daysOut!==undefined ? e.daysOut : t.daysOut;
+      const due = new Date(ev); due.setDate(ev.getDate()-daysOut);
+      const diff = Math.ceil((due-today)/86400000);
+      return {...t, item: e.item!==undefined?e.item:t.item, daysOut, due:due.toLocaleDateString("en-US",{month:"short",day:"numeric"}), diff, dueDateObj:due, isEdited:true};
+    });
+  },[tasks,taskEdits,eventDate]);
+
+  const filtered = useMemo(()=>effectiveTasks.filter(t=>
+    (fmRole==="full"||t.phase!=="P1")&&
+    (activePhase==="All"||t.phase===activePhase)&&
+    (activeCluster==="All"||t.cluster===activeCluster)&&
+    (showHiddenTasks||!hiddenTasks[t.id])
+  ),[effectiveTasks,activePhase,activeCluster,hiddenTasks,showHiddenTasks,fmRole]);
+
+  const hiddenCount = useMemo(()=>effectiveTasks.filter(t=>hiddenTasks[t.id]&&(fmRole==="full"||t.phase!=="P1")).length,[effectiveTasks,hiddenTasks,fmRole]);
+
+  const stats = useMemo(()=>{
+    const visible = effectiveTasks.filter(t=>!hiddenTasks[t.id]&&(fmRole==="full"||t.phase!=="P1"));
+    return{
+      overdue:visible.filter(t=>t.diff<0&&t.daysOut!==0).length,
+      soon:visible.filter(t=>t.diff>=0&&t.diff<=14).length,
+      upcoming:visible.filter(t=>t.diff>14).length,
+      total:visible.length,
+    };
+  },[effectiveTasks,hiddenTasks,fmRole]);
+
+  const goNoGoDateObj = goNoGoEnabled && goNoGoDate ? new Date(goNoGoDate+"T12:00:00") : null;
+  const daysToGoNoGo = goNoGoDateObj && eventDate ? Math.ceil((new Date(eventDate+"T12:00:00") - goNoGoDateObj) / (1000 * 60 * 60 * 24)) : null;
+
+  // Demo-mode agents (scripted outputs — zero API cost)
+  const callAgent = (id, item, type) => {
+    const key=`${id}-${type}`; setTaskLoading(p=>({...p,[key]:true})); setExpandedTask(p=>({...p,[id]:true}));
+    setTimeout(()=>{
+      setTaskOutputs(p=>({...p,[key]:demoTaskOutput(type, item, eventName, eventDate, venue.name)}));
+      setTaskLoading(p=>({...p,[key]:false}));
+    }, DEMO_DELAY);
+  };
+
+  const runGlobal = (type) => {
+    setGlobalLoading(type); setGlobalOutput("");
+    const vendorNames = vendors.length ? vendors.map(v=>`${v.name} (${v.role})`).join(", ") : "";
+    setTimeout(()=>{
+      setGlobalOutput(demoGlobalOutput(type, eventName, eventDate, venue.name, vendorNames));
+      setGlobalLoading(null);
+    }, DEMO_DELAY);
+  };
+
+  const generateVendorComm = (vendorId) => {
+    const v=vendors.find(x=>x.id===vendorId); if(!v) return;
+    setVendorLoading(p=>({...p,[vendorId]:true}));
+    const vmLine = v.shareVenueManager&&venue.managerName?`Venue manager: ${venue.managerName}, ${venue.managerPhone}, ${venue.managerEmail}.`:"";
+    setTimeout(()=>{
+      setVendorOutputs(p=>({...p,[vendorId]:demoVendorOutput(v, eventName, eventDate, vmLine)}));
+      setVendorLoading(p=>({...p,[vendorId]:false}));
+    }, DEMO_DELAY);
+  };
+
+  const saveVendor = () => {
+    if(!editingVendor?.name||!editingVendor?.role) return;
+    if(editingVendor.id) setVendors(p=>p.map(v=>v.id===editingVendor.id?editingVendor:v));
+    else setVendors(p=>[...p,{...editingVendor,id:Date.now()}]);
+    setEditingVendor(null);
+  };
+  const toggleDeliverable = d => { if(!editingVendor) return; const c=editingVendor.deliverables||[]; setEditingVendor(p=>({...p,deliverables:c.includes(d)?c.filter(x=>x!==d):[...c,d]})); };
+  const venueComplete = venue.managerName&&venue.managerPhone&&venue.managerEmail;
+  const st = {fontFamily:"var(--font-sans)",color:"var(--color-text-primary)",fontSize:14};
+  const emailCalendar = getEmailCalendar();
+  const skippedCount = Object.values(skippedEmails).filter(Boolean).length;
+
+  return (
+    <div style={{...st,padding:"1.25rem 1rem",maxWidth:900,margin:"0 auto"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"1.25rem",gap:10,flexWrap:"wrap"}}>
+        <div style={{flex:1,minWidth:250}}>
+          <div style={{fontSize:10,fontWeight:500,letterSpacing:"1px",textTransform:"uppercase",color:"var(--color-text-secondary)",marginBottom:3}}>FMMC · Field Marketing Mission Control</div>
+          <h2 style={{fontSize:20,fontWeight:500,margin:"0 0 2px"}}>Engine 02 — Shot clock agent</h2>
+          <p style={{fontSize:12,color:"var(--color-text-secondary)",margin:0}}>The FM Lead's private command instrument. From kick-off to doors open — on your cadence.</p>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {saveStatus==="saving"&&<span style={{fontSize:10,color:"var(--color-text-secondary)",fontStyle:"italic"}}>Saving…</span>}
+          {saveStatus==="saved"&&<span style={{fontSize:10,color:"#0F6E56",fontWeight:500}}>💾 Saved</span>}
+          {saveStatus==="error"&&<span style={{fontSize:10,color:"#A32D2D",fontWeight:500}}>⚠ Save error</span>}
+          <button onClick={clearSavedData} style={{fontSize:10,padding:"3px 8px",color:confirmClear?"#fff":"#A32D2D",borderColor:confirmClear?"#A32D2D":"#A32D2D40",background:confirmClear?"#A32D2D":"transparent",fontWeight:confirmClear?500:400}}>{confirmClear?"Confirm clear? (click again)":"Clear all data"}</button>
+        </div>
+      </div>
+
+      {/* Row 1 — event name + date */}
+      <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+        <input value={eventName} onChange={e=>setEventName(e.target.value)} placeholder="Event name" style={{flex:2,minWidth:180}}/>
+        <input type="date" value={eventDate} onChange={e=>setEventDate(e.target.value)} style={{flex:1,minWidth:140}}/>
+      </div>
+
+      {/* FM role — shapes whether P1 strategy tasks are included */}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:"1.25rem",padding:"9px 12px",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-md)",flexWrap:"wrap"}}>
+        <div style={{fontSize:12,fontWeight:500,whiteSpace:"nowrap"}}>Your role on this event:</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {[
+            {id:"full", label:"Strategy + execution", desc:"Full shot clock, P1 onward"},
+            {id:"execution", label:"Execution only", desc:"Starts at P2 — scope and budget already defined"},
+          ].map(r=>{
+            const on = fmRole===r.id;
+            return(
+              <button key={r.id} onClick={()=>setFmRole(r.id)} title={r.desc}
+                style={{fontSize:12,padding:"5px 14px",borderRadius:20,border:`0.5px solid ${on?"#185FA5":"var(--color-border-secondary)"}`,background:on?"#E6F1FB":"transparent",color:on?"#185FA5":"var(--color-text-secondary)",cursor:"pointer",fontWeight:on?500:400}}>
+                {r.label}
+              </button>
+            );
+          })}
+        </div>
+        {fmRole==="execution"&&<span style={{fontSize:11,color:"var(--color-text-secondary)"}}>P1 (Budget/Strategy) tasks excluded — switch back anytime to restore them.</span>}
+      </div>
+
+      {/* GO / NO-GO DECISION DATE */}
+      <div style={{border:`0.5px solid ${goNoGoEnabled?"#8B1A1A":"var(--color-border-tertiary)"}`,borderRadius:"var(--border-radius-lg)",marginBottom:"1.25rem",overflow:"hidden",background:goNoGoEnabled?"#FBEAEA":"var(--color-background-primary)"}}>
+        <div style={{padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:18}}>{goNoGoEnabled?"🚦":"⚪"}</span>
+            <div>
+              <div style={{fontSize:13,fontWeight:500,color:goNoGoEnabled?"#8B1A1A":"var(--color-text-primary)"}}>Go / No-Go decision date</div>
+              <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>
+                {goNoGoEnabled?"The moment leadership decides to proceed or pull the event":"Optional — activate to lock in a formal governance milestone"}
+              </div>
+            </div>
+          </div>
+          <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12}}>
+            <input type="checkbox" checked={goNoGoEnabled} onChange={e=>{setGoNoGoEnabled(e.target.checked); if(!e.target.checked) setGoNoGoDate("");}} style={{width:14,height:14}}/>
+            <span style={{fontWeight:500,color:goNoGoEnabled?"#8B1A1A":"var(--color-text-secondary)"}}>{goNoGoEnabled?"Active":"Activate"}</span>
+          </label>
+        </div>
+        {goNoGoEnabled&&(
+          <div style={{padding:"0 14px 12px",display:"flex",gap:14,flexWrap:"wrap",alignItems:"flex-end"}}>
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <label style={{fontSize:11,color:"var(--color-text-secondary)",fontWeight:500}}>Decision date</label>
+              <input type="date" value={goNoGoDate} onChange={e=>setGoNoGoDate(e.target.value)} style={{fontSize:13,padding:"6px 10px",border:"0.5px solid var(--color-border-secondary)",borderRadius:"var(--border-radius-md)"}}/>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <label style={{fontSize:11,color:"#8B1A1A",fontWeight:500}}>⚠ Venue cancellation deadline (per contract)</label>
+              <input type="date" value={venue.cancellationDeadline} onChange={e=>setVenue(p=>({...p,cancellationDeadline:e.target.value}))} style={{fontSize:13,padding:"6px 10px",border:"0.5px solid #E8C4C4",borderRadius:"var(--border-radius-md)",background:"#FEF8F8"}}/>
+            </div>
+            {goNoGoDate&&eventDate&&daysToGoNoGo!==null&&(
+              <div style={{fontSize:11,color:"#8B1A1A",padding:"6px 10px",background:"#FDF0F0",borderRadius:4,border:"0.5px solid #E8C4C4",fontWeight:500}}>
+                📅 {daysToGoNoGo} days before event
+              </div>
+            )}
+            {goNoGoDate&&(
+              <div style={{fontSize:10,color:"var(--color-text-secondary)",lineHeight:1.6,flex:1,minWidth:200,padding:"4px 0"}}>
+                ✓ Timeline milestone marker activated<br/>
+                ✓ Pre-decision tasks and emails flagged<br/>
+                ✓ Decision-maker reminders queued: T-14, T-7, T-1
+              </div>
+            )}
+          </div>
+        )}
+        {goNoGoEnabled&&goNoGoDate&&venue.cancellationDeadline&&new Date(goNoGoDate) > new Date(venue.cancellationDeadline)&&(
+          <div style={{margin:"0 14px 12px",padding:"10px 12px",background:"#FCEBEB",border:"1px solid #A32D2D",borderRadius:"var(--border-radius-md)",display:"flex",gap:10,alignItems:"flex-start"}}>
+            <span style={{fontSize:16,lineHeight:1}}>⚠</span>
+            <div style={{fontSize:11,color:"#A32D2D",lineHeight:1.5}}>
+              <strong>Warning:</strong> Your Go/No-Go decision date ({new Date(goNoGoDate+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})}) is <strong>after</strong> the venue cancellation deadline ({new Date(venue.cancellationDeadline+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})}). A "No-Go" decision would still incur full venue costs per contract.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* EMAIL CADENCE */}
+      <div style={{border:"0.5px solid var(--color-border-secondary)",borderRadius:"var(--border-radius-lg)",marginBottom:"1.25rem",overflow:"hidden"}}>
+        <div style={{padding:"10px 14px",background:"var(--color-background-secondary)",borderBottom:"0.5px solid var(--color-border-tertiary)",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:6}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:500}}>When does your first email go out?</div>
+            <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:1}}>Recommended for this event type: <strong>{recWeeks} weeks before</strong>{eventDate&&` — ${new Date(new Date(eventDate+"T12:00:00").setDate(new Date(eventDate+"T12:00:00").getDate()-(recWeeks*7))).toLocaleDateString("en-US",{month:"short",day:"numeric"})}`}</div>
+          </div>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            {eventDate&&<div style={{fontSize:11,padding:"3px 10px",borderRadius:10,background:"#E1F5EE",color:"#0F6E56",fontWeight:500}}>First: {effectiveWeeks}w · {emailCalendar[0]?.date||"—"}</div>}
+            {skippedCount>0&&<div style={{fontSize:11,padding:"3px 10px",borderRadius:10,background:"#FDF5E6",color:"#8B6914",fontWeight:500,border:"0.5px solid #E8A33D"}}>{skippedCount} skipped</div>}
+          </div>
+        </div>
+        <div style={{padding:"12px 14px"}}>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:firstEmailWeeks===-1?10:0}}>
+            {EMAIL_CADENCE_OPTIONS.map(o=>{
+              const on=firstEmailWeeks===o.weeks;
+              const isRec=o.weeks===recWeeks;
+              return(
+                <div key={o.weeks} onClick={()=>setFirstEmailWeeks(o.weeks)}
+                  style={{border:`${on?"2px":"0.5px"} solid ${on?"#185FA5":isRec?"#0F6E56":"var(--color-border-tertiary)"}`,borderRadius:"var(--border-radius-md)",padding:"7px 12px",cursor:"pointer",background:on?"#E6F1FB":"var(--color-background-primary)",position:"relative",minWidth:90}}>
+                  {isRec&&!on&&<div style={{position:"absolute",top:-1,right:5,fontSize:8,fontWeight:500,padding:"1px 4px",background:"#0F6E56",color:"#fff",borderRadius:"0 0 3px 3px"}}>Rec.</div>}
+                  <div style={{fontSize:12,fontWeight:500,color:on?"#185FA5":"var(--color-text-primary)"}}>{o.label}</div>
+                  <div style={{fontSize:10,color:"var(--color-text-secondary)",lineHeight:1.3,marginTop:1}}>{o.desc}</div>
+                </div>
+              );
+            })}
+          </div>
+          {firstEmailWeeks===-1&&(
+            <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
+              <label style={{fontSize:12,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>Weeks before event:</label>
+              <input type="number" min={1} max={24} value={customWeeks} onChange={e=>setCustomWeeks(e.target.value)} placeholder="e.g. 7" style={{width:80,fontSize:13}}/>
+              {customWeeks&&eventDate&&<span style={{fontSize:11,color:"#0F6E56",fontWeight:500}}>First: {new Date(new Date(eventDate+"T12:00:00").setDate(new Date(eventDate+"T12:00:00").getDate()-(parseInt(customWeeks)*7))).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>}
+            </div>
+          )}
+          {eventDate&&(
+            <div style={{marginTop:12,borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:10}}>
+              <div style={{fontSize:11,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>Your email calendar — FM controls the cadence</div>
+              <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                {emailCalendar.map((e,i)=>{
+                  const isSkipped = skippedEmails[e.id];
+                  const isPreDecision = goNoGoEnabled && goNoGoDateObj && e.dateObj <= goNoGoDateObj;
+                  const isMenuOpen = menuOpenEmail === e.id;
+                  return(
+                    <div key={e.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",borderRadius:"var(--border-radius-md)",background:isSkipped?"#FDF5E6":"var(--color-background-secondary)",border:`0.5px solid ${isSkipped?"#E8A33D":"transparent"}`,opacity:isSkipped?0.75:1,position:"relative"}}>
+                      <input
+                        type="date"
+                        value={e.dateIso}
+                        onChange={(ev)=>setEmailDateOverrides(p=>({...p,[e.id]:ev.target.value}))}
+                        disabled={isSkipped}
+                        style={{fontSize:11,padding:"4px 6px",borderRadius:4,border:`0.5px solid ${e.isOverridden?"#185FA5":"var(--color-border-tertiary)"}`,background:isSkipped?"#FDF5E6":e.isOverridden?"#E6F1FB":"var(--color-background-primary)",color:isSkipped?"#8B6914":e.isOverridden?"#185FA5":"var(--color-text-primary)",fontWeight:e.isOverridden?500:400,flexShrink:0,width:130,cursor:isSkipped?"not-allowed":"pointer"}}
+                      />
+                      <div style={{flex:1,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                        <span style={{fontSize:12,fontWeight:400,color:"var(--color-text-primary)",textDecoration:isSkipped?"line-through":"none"}}>{e.label}</span>
+                        {isSkipped&&<span style={{fontSize:9,fontWeight:500,padding:"1px 6px",borderRadius:3,background:"#FDF5E6",color:"#8B6914",border:"0.5px solid #E8A33D",textTransform:"uppercase",letterSpacing:"0.5px"}}>Skipped</span>}
+                        {e.isOverridden&&!isSkipped&&<span title="Date manually adjusted by FM" style={{fontSize:9,fontWeight:500,padding:"1px 6px",borderRadius:3,background:"#E6F1FB",color:"#185FA5",border:"0.5px solid #185FA5"}}>📅 Custom date</span>}
+                        {e.isWeekend&&!isSkipped&&<span title="This date falls on a weekend" style={{fontSize:9,fontWeight:500,padding:"1px 6px",borderRadius:3,background:"#FAEEDA",color:"#854F0B",border:"0.5px solid #E8A33D"}}>⚠ Weekend</span>}
+                        {isPreDecision&&!isSkipped&&<span title="Must be complete before Go/No-Go decision" style={{fontSize:9,fontWeight:500,padding:"1px 6px",borderRadius:3,background:"#FBEAEA",color:"#8B1A1A",border:"0.5px solid #E8C4C4"}}>⚑ Pre-decision</span>}
+                      </div>
+                      <div style={{position:"relative"}}>
+                        <button onClick={()=>setMenuOpenEmail(isMenuOpen?null:e.id)} aria-label="More options" style={{width:24,height:24,border:"none",background:"transparent",cursor:"pointer",borderRadius:3,color:"var(--color-text-secondary)",fontSize:16,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center"}}>⋯</button>
+                        {isMenuOpen&&(
+                          <div style={{position:"absolute",right:0,top:26,zIndex:10,minWidth:220,background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-secondary)",borderRadius:"var(--border-radius-md)",boxShadow:"0 4px 12px rgba(0,0,0,0.1)",padding:4}}>
+                            <button onClick={()=>toggleSkipEmail(e.id)} style={{width:"100%",textAlign:"left",padding:"7px 10px",border:"none",background:"transparent",fontSize:12,cursor:"pointer",borderRadius:3,color:"var(--color-text-primary)"}}>
+                              {isSkipped?"↩ Restore this instance":"⊘ Skip this instance"}
+                            </button>
+                            {e.isOverridden&&!isSkipped&&(
+                              <button onClick={()=>{setEmailDateOverrides(p=>{const n={...p};delete n[e.id];return n;});setMenuOpenEmail(null);}} style={{width:"100%",textAlign:"left",padding:"7px 10px",border:"none",background:"transparent",fontSize:12,cursor:"pointer",borderRadius:3,color:"var(--color-text-primary)",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+                                ↺ Reset to suggested date
+                              </button>
+                            )}
+                            <div style={{fontSize:10,color:"var(--color-text-secondary)",padding:"4px 10px 6px",lineHeight:1.4}}>
+                              {isSkipped?"Restores for this event only. Template unchanged.":"Mutes send for this event only. Template preserved."}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* EVENT TYPE */}
+      <div style={{border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",marginBottom:"1.25rem",overflow:"hidden"}}>
+        <div style={{padding:"10px 14px",background:"var(--color-background-secondary)",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+          <div style={{fontSize:13,fontWeight:500,marginBottom:8}}>Event type</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {[{id:"main",label:"Main event"},{id:"anchor",label:"Anchor event activation"},{id:"satellite",label:"Satellite event"}].map(t=>{
+              const on=eventType===t.id;
+              return(<button key={t.id} onClick={()=>{setEventType(t.id);setGenerated(false);setTasks([]);setFirstEmailWeeks(RECOMMENDED_WEEKS[t.id]||8);}}
+                style={{fontSize:12,padding:"5px 14px",borderRadius:20,border:`0.5px solid ${on?"#185FA5":"var(--color-border-secondary)"}`,background:on?"#E6F1FB":"transparent",color:on?"#185FA5":"var(--color-text-secondary)",cursor:"pointer",fontWeight:on?500:400}}>
+                {t.label}
+              </button>);
+            })}
+          </div>
+        </div>
+
+        {eventType==="main"&&(
+          <div style={{padding:"10px 14px"}}>
+            <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:8}}>Hosting satellite events alongside this? Add them below — each runs its own shot clock instance.</div>
+            <button onClick={addSatellite} style={{fontSize:12,padding:"4px 12px",fontWeight:500,marginBottom:satellites.length>0?10:0}}>+ Add satellite event</button>
+            {satellites.map(sat=>{
+              const satType=SATELLITE_TYPES.find(t=>t.id===sat.type);
+              const isActive=activeSatellite===sat.id;
+              return(
+                <div key={sat.id} style={{border:`0.5px solid ${sat.type?"#185FA5":"var(--color-border-tertiary)"}`,borderRadius:"var(--border-radius-md)",marginBottom:5,overflow:"hidden"}}>
+                  <div onClick={()=>setActiveSatellite(isActive?null:sat.id)} style={{padding:"7px 12px",background:sat.type?"#E6F1FB":"var(--color-background-primary)",cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>
+                    {sat.type&&<div style={{width:26,height:26,borderRadius:5,background:"#185FA5",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:500,color:"#fff",flexShrink:0}}>{satType?.icon}</div>}
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:12,fontWeight:500,color:sat.type?"#185FA5":"var(--color-text-secondary)"}}>{sat.type?(sat.name||satType?.label):"Select satellite type"}</div>
+                      {sat.date&&<div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{new Date(sat.date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</div>}
+                    </div>
+                    <button onClick={e=>{e.stopPropagation();removeSatellite(sat.id);}} style={{fontSize:11,padding:"2px 7px",color:"#A32D2D",borderColor:"#A32D2D40"}}>Remove</button>
+                    <span style={{fontSize:11,color:"var(--color-text-secondary)"}}>{isActive?"▲":"▼"}</span>
+                  </div>
+                  {isActive&&(
+                    <div style={{padding:"10px 12px",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",gap:5,marginBottom:8}}>
+                        {SATELLITE_TYPES.map(t=>{
+                          const on=sat.type===t.id;
+                          return(<div key={t.id} onClick={()=>updateSatellite(sat.id,"type",t.id)} style={{border:`${on?"2px":"0.5px"} solid ${on?"#185FA5":"var(--color-border-tertiary)"}`,borderRadius:"var(--border-radius-md)",padding:"6px 9px",cursor:"pointer",background:on?"#E6F1FB":"var(--color-background-primary)",display:"flex",gap:7,alignItems:"flex-start"}}>
+                            <div style={{width:22,height:22,borderRadius:4,background:on?"#185FA5":"var(--color-background-secondary)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:500,color:on?"#fff":"var(--color-text-secondary)",flexShrink:0}}>{t.icon}</div>
+                            <div><div style={{fontSize:11,fontWeight:500,color:on?"#185FA5":"var(--color-text-primary)"}}>{t.label}</div><div style={{fontSize:10,color:"var(--color-text-secondary)",lineHeight:1.3}}>{t.desc}</div></div>
+                          </div>);
+                        })}
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                        <Inp label="Satellite name" val={sat.name} onChange={v=>updateSatellite(sat.id,"name",v)} placeholder={satType?.label||"Satellite event"}/>
+                        <Inp label="Satellite date" val={sat.date} onChange={v=>updateSatellite(sat.id,"date",v)} type="date"/>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {satellites.filter(s=>s.type).length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>{satellites.filter(s=>s.type).map(s=>{const t=SATELLITE_TYPES.find(x=>x.id===s.type);return(<span key={s.id} style={{fontSize:11,padding:"2px 8px",borderRadius:8,background:"#E6F1FB",color:"#185FA5",fontWeight:500}}>{s.name||t?.label}{s.date?` · ${new Date(s.date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})}`:""}</span>);})}</div>}
+          </div>
+        )}
+
+        {eventType==="anchor"&&(
+          <div style={{padding:"10px 14px"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              <Inp label="Anchor event name" val={anchorEventName} onChange={setAnchorEventName} placeholder="e.g. RSA Conference, Dreamforce, Black Hat"/>
+              <div>
+                <label style={{fontSize:11,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Your activation type</label>
+                <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                  {ANCHOR_ACTIVATION_TYPES.map(t=>{const on=anchorActivationType.includes(t);return(<button key={t} onClick={()=>toggleActivationType(t)} style={{fontSize:11,padding:"3px 9px",borderRadius:10,border:`0.5px solid ${on?"#993556":"var(--color-border-secondary)"}`,background:on?"#FBEAF0":"transparent",color:on?"#993556":"var(--color-text-secondary)",cursor:"pointer",fontWeight:on?500:400}}>{t}</button>);})}
+                </div>
+              </div>
+            </div>
+            <div style={{padding:"7px 10px",background:"#FBEAF0",borderRadius:"var(--border-radius-md)",fontSize:11,color:"#993556"}}>
+              Focused 30-task activation shot clock — targeted to what matters when activating at someone else's event.
+              {anchorEventName&&<strong> Activating at: {anchorEventName}{anchorActivationType.length>0?` · ${anchorActivationType.join(", ")}`:""}</strong>}
+            </div>
+          </div>
+        )}
+
+        {eventType==="satellite"&&(
+          <div style={{padding:"10px 14px"}}>
+            <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:8}}>Running this satellite as its own independent FMMC instance. What type?</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",gap:5}}>
+              {SATELLITE_TYPES.map(t=>{const on=satellites[0]?.type===t.id;return(<div key={t.id} onClick={()=>{if(satellites.length===0)setSatellites([{id:Date.now(),type:t.id,name:"",date:"",customType:""}]);else updateSatellite(satellites[0].id,"type",t.id);}} style={{border:`${on?"2px":"0.5px"} solid ${on?"#185FA5":"var(--color-border-tertiary)"}`,borderRadius:"var(--border-radius-md)",padding:"6px 9px",cursor:"pointer",background:on?"#E6F1FB":"var(--color-background-primary)",display:"flex",gap:7,alignItems:"flex-start"}}>
+                <div style={{width:22,height:22,borderRadius:4,background:on?"#185FA5":"var(--color-background-secondary)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:500,color:on?"#fff":"var(--color-text-secondary)",flexShrink:0}}>{t.icon}</div>
+                <div><div style={{fontSize:11,fontWeight:500,color:on?"#185FA5":"var(--color-text-primary)"}}>{t.label}</div><div style={{fontSize:10,color:"var(--color-text-secondary)",lineHeight:1.3}}>{t.desc}</div></div>
+              </div>);
+            })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* VENUE */}
+      <div style={{border:`0.5px solid ${venueComplete?"#0F6E56":"var(--color-border-tertiary)"}`,borderRadius:"var(--border-radius-lg)",marginBottom:8,overflow:"hidden"}}>
+        <div onClick={()=>setShowVenue(p=>!p)} style={{padding:"9px 14px",background:venueComplete?"#E1F5EE":"var(--color-background-secondary)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{width:7,height:7,borderRadius:"50%",background:venueComplete?"#0F6E56":"#D3D1C7",flexShrink:0}}/>
+            <span style={{fontSize:12,fontWeight:500,color:venueComplete?"#0F6E56":"var(--color-text-primary)"}}>Venue and event manager</span>
+            {venueComplete?<span style={{fontSize:11,color:"#0F6E56"}}>{venue.name&&`${venue.name} · `}{venue.managerName} · {venue.managerPhone}</span>:<span style={{fontSize:11,color:"var(--color-text-secondary)"}}>Add venue contact details</span>}
+          </div>
+          <span style={{fontSize:11,color:"var(--color-text-secondary)"}}>{showVenue?"▲":"▼"}</span>
+        </div>
+        {showVenue&&(
+          <div style={{padding:"1rem 1.25rem",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+            <div style={{marginBottom:10}}>
+              <label style={{fontSize:11,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Venue type</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
+                {VENUE_TYPES.map(t=>{const on=venue.type===t;return(<button key={t} onClick={()=>setVenue(p=>({...p,type:t}))} style={{fontSize:11,padding:"3px 9px",borderRadius:10,border:`0.5px solid ${on?"#185FA5":"var(--color-border-secondary)"}`,background:on?"#E6F1FB":"transparent",color:on?"#185FA5":"var(--color-text-secondary)",cursor:"pointer",fontWeight:on?500:400}}>{t}</button>);})}
+              </div>
+              <input value={venue.type} onChange={e=>setVenue(p=>({...p,type:e.target.value}))} placeholder="Or type your own — e.g. Private members club, Vineyard, Yacht" style={{width:"100%",boxSizing:"border-box",fontSize:12}}/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div>
+                <Inp label="Venue name" val={venue.name} onChange={v=>setVenue(p=>({...p,name:v}))} placeholder="e.g. InterContinental Boston"/>
+                <Inp label="Venue address" val={venue.address} onChange={v=>setVenue(p=>({...p,address:v}))} placeholder="Full address"/>
+                <Inp label="Loading dock hours" val={venue.loadingDockHours} onChange={v=>setVenue(p=>({...p,loadingDockHours:v}))} placeholder="e.g. 6am-10pm"/>
+                <Inp label="WiFi password (staff)" val={venue.wifiPassword} onChange={v=>setVenue(p=>({...p,wifiPassword:v}))} placeholder="Staff network password"/>
+                <Inp label="Parking notes" val={venue.parkingNotes} onChange={v=>setVenue(p=>({...p,parkingNotes:v}))} placeholder="e.g. Validated in garage B"/>
+                <Inp label="Venue emergency line" val={venue.emergencyLine} onChange={v=>setVenue(p=>({...p,emergencyLine:v}))} placeholder="24hr emergency number" type="tel"/>
+                <div style={{marginTop:8,paddingTop:8,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+                  <label style={{fontSize:11,color:"#8B1A1A",display:"block",marginBottom:4,fontWeight:500}}>⚠ Cancellation deadline (per contract)</label>
+                  <input type="date" value={venue.cancellationDeadline} onChange={e=>setVenue(p=>({...p,cancellationDeadline:e.target.value}))} style={{width:"100%",boxSizing:"border-box",fontSize:13,padding:"6px 10px",border:"0.5px solid #E8C4C4",borderRadius:"var(--border-radius-md)",background:"#FEF8F8"}}/>
+                  <div style={{fontSize:10,color:"var(--color-text-secondary)",marginTop:3,lineHeight:1.4}}>Last day to cancel without full venue penalty. Critical for Go/No-Go decisions.</div>
+                </div>
+              </div>
+              <div>
+                <div style={{fontSize:12,fontWeight:500,color:"#185FA5",marginBottom:8,paddingBottom:5,borderBottom:"0.5px solid var(--color-border-tertiary)"}}>Primary event manager</div>
+                <Inp label="Full name" val={venue.managerName} onChange={v=>setVenue(p=>({...p,managerName:v}))} placeholder="Manager name"/>
+                <Inp label="Title / role" val={venue.managerTitle} onChange={v=>setVenue(p=>({...p,managerTitle:v}))} placeholder="e.g. Conference Services Manager"/>
+                <Inp label="Mobile / direct line" val={venue.managerPhone} onChange={v=>setVenue(p=>({...p,managerPhone:v}))} placeholder="+1 617 555 0100" type="tel"/>
+                <Inp label="Email" val={venue.managerEmail} onChange={v=>setVenue(p=>({...p,managerEmail:v}))} placeholder="manager@venue.com" type="email"/>
+                <div style={{fontSize:12,fontWeight:500,color:"#854F0B",marginBottom:8,marginTop:8,paddingBottom:5,borderBottom:"0.5px solid var(--color-border-tertiary)"}}>Backup / day-of contact</div>
+                <Inp label="Backup name" val={venue.backupName} onChange={v=>setVenue(p=>({...p,backupName:v}))} placeholder="Backup contact name"/>
+                <Inp label="Backup mobile" val={venue.backupPhone} onChange={v=>setVenue(p=>({...p,backupPhone:v}))} placeholder="+1 617 555 0101" type="tel"/>
+                <Inp label="Backup email" val={venue.backupEmail} onChange={v=>setVenue(p=>({...p,backupEmail:v}))} placeholder="backup@venue.com" type="email"/>
+              </div>
+            </div>
+            {venueComplete&&<div style={{marginTop:10,padding:"8px 12px",background:"#E1F5EE",borderRadius:"var(--border-radius-md)",fontSize:11,color:"#085041",lineHeight:1.8}}><strong>Break glass —</strong> {venue.name}{venue.type?` (${venue.type})`:""}{venue.address?` · ${venue.address}`:""}<br/>Manager: <strong>{venue.managerName}</strong>{venue.managerTitle?` — ${venue.managerTitle}`:""}{venue.managerPhone?` · ${venue.managerPhone}`:""}{venue.managerEmail?` · ${venue.managerEmail}`:""}{venue.backupName?<React.Fragment><br/>Backup: {venue.backupName}{venue.backupPhone?` · ${venue.backupPhone}`:""}</React.Fragment>:""}{venue.loadingDockHours?<React.Fragment><br/>Dock: {venue.loadingDockHours}</React.Fragment>:""}{venue.emergencyLine?<React.Fragment> · Emergency: {venue.emergencyLine}</React.Fragment>:""}</div>}
+          </div>
+        )}
+      </div>
+
+      {/* VENDORS */}
+      <div style={{border:`0.5px solid ${vendors.length>0?"#534AB7":"var(--color-border-tertiary)"}`,borderRadius:"var(--border-radius-lg)",marginBottom:"1.25rem",overflow:"hidden"}}>
+        <div onClick={()=>setShowVendors(p=>!p)} style={{padding:"9px 14px",background:vendors.length>0?"#EEEDFE":"var(--color-background-secondary)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{width:7,height:7,borderRadius:"50%",background:vendors.length>0?"#534AB7":"#D3D1C7",flexShrink:0}}/>
+            <span style={{fontSize:12,fontWeight:500,color:vendors.length>0?"#534AB7":"var(--color-text-primary)"}}>Vendor roster and communications</span>
+            <span style={{fontSize:11,color:"var(--color-text-secondary)"}}>{vendors.length>0?`${vendors.length} vendor${vendors.length>1?"s":""}: ${vendors.map(v=>v.name).join(", ")}` : "Add vendors performing fulfillment duties"}</span>
+          </div>
+          <span style={{fontSize:11,color:"var(--color-text-secondary)"}}>{showVendors?"▲":"▼"}</span>
+        </div>
+        {showVendors&&(
+          <div style={{padding:"1rem 1.25rem",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+            {!editingVendor&&<button onClick={()=>setEditingVendor({...EMPTY_VENDOR,deliverables:[]})} style={{fontSize:12,padding:"5px 14px",marginBottom:vendors.length>0?12:0,fontWeight:500}}>+ Add vendor</button>}
+            {editingVendor&&(
+              <div style={{border:"2px solid #534AB7",borderRadius:"var(--border-radius-lg)",padding:"1rem",marginBottom:12,background:"#EEEDFE"}}>
+                <div style={{fontSize:12,fontWeight:500,color:"#534AB7",marginBottom:10}}>{editingVendor.id?"Edit vendor":"New vendor"}</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                  <div>
+                    <Inp label="Vendor name" val={editingVendor.name} onChange={v=>setEditingVendor(p=>({...p,name:v}))} placeholder="Company name"/>
+                    <Inp label="Contact name" val={editingVendor.contactName} onChange={v=>setEditingVendor(p=>({...p,contactName:v}))} placeholder="Primary contact"/>
+                    <Inp label="Contact mobile" val={editingVendor.contactPhone} onChange={v=>setEditingVendor(p=>({...p,contactPhone:v}))} placeholder="+1 617 555 0200" type="tel"/>
+                    <Inp label="Contact email" val={editingVendor.contactEmail} onChange={v=>setEditingVendor(p=>({...p,contactEmail:v}))} placeholder="contact@vendor.com" type="email"/>
+                  </div>
+                  <div>
+                    <div style={{marginBottom:10}}>
+                      <label style={{fontSize:11,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Fulfillment role</label>
+                      <select value={editingVendor.role} onChange={e=>setEditingVendor(p=>({...p,role:e.target.value,deliverables:[]}))} style={{width:"100%",fontSize:13,padding:"7px 8px"}}>
+                        <option value="">Select role...</option>
+                        {VENDOR_ROLES.map(r=><option key={r} value={r}>{r}</option>)}
+                      </select>
+                    </div>
+                    <div style={{marginBottom:10}}>
+                      <label style={{fontSize:11,color:"var(--color-text-secondary)",display:"block",marginBottom:4}}>Additional notes</label>
+                      <textarea value={editingVendor.customNote||""} onChange={e=>setEditingVendor(p=>({...p,customNote:e.target.value}))} placeholder="e.g. Must arrive by 6am. Deliver to loading dock B." rows={3} style={{width:"100%",boxSizing:"border-box",fontSize:12,resize:"vertical"}}/>
+                    </div>
+                    <div onClick={()=>setEditingVendor(p=>({...p,shareVenueManager:!p.shareVenueManager}))} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"var(--color-background-primary)",borderRadius:"var(--border-radius-md)",border:"0.5px solid var(--color-border-tertiary)",cursor:"pointer"}}>
+                      <div style={{width:16,height:16,borderRadius:3,border:`0.5px solid ${editingVendor.shareVenueManager?"#0F6E56":"var(--color-border-secondary)"}`,background:editingVendor.shareVenueManager?"#0F6E56":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{editingVendor.shareVenueManager&&<span style={{fontSize:10,color:"#fff",lineHeight:1}}>✓</span>}</div>
+                      <div><div style={{fontSize:12,fontWeight:500}}>Share venue manager contact</div><div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{venueComplete?`${venue.managerName} · ${venue.managerPhone}`:"Add venue manager first"}</div></div>
+                    </div>
+                  </div>
+                </div>
+                {editingVendor.role&&VENDOR_DELIVERABLES[editingVendor.role]&&(
+                  <div style={{marginTop:10}}>
+                    <div style={{fontSize:12,fontWeight:500,marginBottom:6}}>Deliverables to include in communication</div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:4}}>
+                      {VENDOR_DELIVERABLES[editingVendor.role].map(d=>{const on=(editingVendor.deliverables||[]).includes(d);return(<div key={d} onClick={()=>toggleDeliverable(d)} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 9px",borderRadius:"var(--border-radius-md)",border:`0.5px solid ${on?"#534AB7":"var(--color-border-tertiary)"}`,background:on?"#EEEDFE":"var(--color-background-primary)",cursor:"pointer"}}><div style={{width:13,height:13,borderRadius:3,border:`0.5px solid ${on?"#534AB7":"var(--color-border-secondary)"}`,background:on?"#534AB7":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{on&&<span style={{fontSize:9,color:"#fff",lineHeight:1}}>✓</span>}</div><span style={{fontSize:11,color:on?"#534AB7":"var(--color-text-primary)"}}>{d}</span></div>);})}
+                    </div>
+                  </div>
+                )}
+                <div style={{display:"flex",gap:8,marginTop:12}}>
+                  <button onClick={saveVendor} disabled={!editingVendor.name||!editingVendor.role} style={{padding:"6px 16px",fontWeight:500,background:editingVendor.name&&editingVendor.role?"#534AB7":undefined,color:editingVendor.name&&editingVendor.role?"#fff":undefined,border:"none",borderRadius:"var(--border-radius-md)",cursor:editingVendor.name&&editingVendor.role?"pointer":"not-allowed",opacity:editingVendor.name&&editingVendor.role?1:0.4}}>Save vendor</button>
+                  <button onClick={()=>setEditingVendor(null)} style={{padding:"6px 14px"}}>Cancel</button>
+                </div>
+              </div>
+            )}
+            {vendors.map(v=>{const isOpen=expandedVendor===v.id;const out=vendorOutputs[v.id];const ldg=vendorLoading[v.id];return(<div key={v.id} style={{border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",marginBottom:5,overflow:"hidden"}}>
+              <div onClick={()=>setExpandedVendor(isOpen?null:v.id)} style={{padding:"8px 12px",cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:28,height:28,borderRadius:6,background:"#EEEDFE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:500,color:"#534AB7",flexShrink:0}}>{v.name.slice(0,2).toUpperCase()}</div>
+                <div style={{flex:1}}><div style={{fontSize:12,fontWeight:500}}>{v.name}</div><div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{v.role}{v.contactName?` · ${v.contactName}`:""}{v.contactPhone?` · ${v.contactPhone}`:""}</div></div>
+                <div style={{display:"flex",gap:4}}>
+                  {v.shareVenueManager&&venueComplete&&<span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"#E1F5EE",color:"#0F6E56",fontWeight:500}}>Venue mgr shared</span>}
+                  {v.deliverables?.length>0&&<span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"#EEEDFE",color:"#534AB7",fontWeight:500}}>{v.deliverables.length} deliverables</span>}
+                  <button onClick={e=>{e.stopPropagation();setEditingVendor({...v});}} style={{fontSize:11,padding:"2px 7px"}}>Edit</button>
+                  <button onClick={e=>{e.stopPropagation();setVendors(p=>p.filter(x=>x.id!==v.id));}} style={{fontSize:11,padding:"2px 7px",color:"#A32D2D",borderColor:"#A32D2D40"}}>Remove</button>
+                  <span style={{fontSize:11,color:"var(--color-text-secondary)"}}>{isOpen?"▲":"▼"}</span>
+                </div>
+              </div>
+              {isOpen&&(<div style={{borderTop:"0.5px solid var(--color-border-tertiary)",padding:"10px 12px",background:"var(--color-background-secondary)"}}>
+                {v.deliverables?.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:10,fontWeight:500,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:4}}>Deliverables</div><div style={{display:"flex",flexWrap:"wrap",gap:4}}>{v.deliverables.map(d=><span key={d} style={{fontSize:11,padding:"2px 7px",borderRadius:8,background:"#EEEDFE",color:"#534AB7"}}>{d}</span>)}</div></div>}
+                {v.customNote&&<div style={{marginBottom:8,fontSize:11,color:"var(--color-text-secondary)",fontStyle:"italic"}}>Note: {v.customNote}</div>}
+                {v.shareVenueManager&&venueComplete&&<div style={{marginBottom:8,padding:"6px 10px",background:"#E1F5EE",borderRadius:"var(--border-radius-md)",fontSize:11,color:"#085041"}}>Venue manager: <strong>{venue.managerName}</strong> · {venue.managerPhone} · {venue.managerEmail}</div>}
+                <button onClick={()=>generateVendorComm(v.id)} disabled={ldg} style={{fontSize:12,padding:"5px 14px",fontWeight:500,background:"#534AB7",color:"#fff",border:"none",borderRadius:"var(--border-radius-md)",cursor:ldg?"not-allowed":"pointer",opacity:ldg?0.6:1}}>{ldg?"Generating...":"Generate vendor communication ↗"}</button>
+                {out&&<div style={{marginTop:8,background:"var(--color-background-primary)",borderRadius:"var(--border-radius-md)",padding:"10px 12px",fontSize:12,whiteSpace:"pre-wrap",lineHeight:1.7,border:"0.5px solid #534AB740"}}><div style={{fontSize:10,fontWeight:500,color:"#534AB7",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.5px"}}>Vendor comm — {v.name}</div>{out}</div>}
+              </div>)}
+            </div>);})}
+          </div>
+        )}
+      </div>
+
+      {/* GENERATE */}
+      <button onClick={generate} disabled={!eventDate} style={{width:"100%",padding:"10px",fontSize:13,fontWeight:500,marginBottom:"1.5rem",background:eventDate?"#185FA5":undefined,color:eventDate?"#fff":undefined,border:"none",borderRadius:"var(--border-radius-lg)",cursor:eventDate?"pointer":"not-allowed",opacity:eventDate?1:0.4}}>
+        Generate shot clock
+      </button>
+
+      {generated&&(
+        <React.Fragment>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:8,marginBottom:"1.25rem"}}>
+            {[{label:"Total tasks",val:stats.total,c:"var(--color-text-primary)"},{label:"Overdue",val:stats.overdue,c:"#A32D2D"},{label:"Due in 14 days",val:stats.soon,c:"#854F0B"},{label:"Upcoming",val:stats.upcoming,c:"#0F6E56"}].map(x=>(
+              <div key={x.label} style={{background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"10px 12px"}}>
+                <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:3}}>{x.label}</div>
+                <div style={{fontSize:22,fontWeight:500,color:x.c}}>{x.val}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"1rem 1.25rem",marginBottom:"1.25rem"}}>
+            <div style={{fontSize:13,fontWeight:500,marginBottom:8}}>Global agents</div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+              {[{key:"ros",label:"Generate run of show ↗"},{key:"deps",label:"Map critical dependencies ↗"},{key:"brief",label:"Draft exec brief ↗"}].map(a=>(
+                <button key={a.key} onClick={()=>runGlobal(a.key)} disabled={!!globalLoading} style={{fontSize:12,padding:"5px 12px"}}>{globalLoading===a.key?"Generating...":a.label}</button>
+              ))}
+            </div>
+            {globalOutput&&<div style={{background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"10px 12px",fontSize:12,whiteSpace:"pre-wrap",lineHeight:1.6,maxHeight:300,overflowY:"auto"}}>{globalOutput}</div>}
+          </div>
+
+          <div style={{marginBottom:10}}>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
+              {["All",...Object.keys(PHASE_META)].filter(p=>fmRole==="full"||p!=="P1").map(p=>(
+                <button key={p} onClick={()=>setActivePhase(p)} style={{fontSize:11,padding:"3px 9px",background:activePhase===p?"var(--color-background-info)":undefined,color:activePhase===p?"var(--color-text-info)":"var(--color-text-secondary)",borderColor:activePhase===p?"var(--color-border-info)":undefined}}>
+                  {p==="All"?"All phases":`${p}: ${PHASE_META[p].label}`}
+                </button>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+              {CLUSTERS.map(c=>(
+                <button key={c} onClick={()=>setActiveCluster(c)} style={{fontSize:11,padding:"3px 9px",background:activeCluster===c?"var(--color-background-secondary)":undefined,color:activeCluster===c?"var(--color-text-primary)":"var(--color-text-secondary)",fontWeight:activeCluster===c?500:400}}>{c}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:8,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+            <span>Showing {filtered.length} of {tasks.length} tasks</span>
+            {hiddenCount>0&&(
+              <button onClick={()=>setShowHiddenTasks(p=>!p)} style={{fontSize:11,padding:"2px 10px",borderRadius:10,background:showHiddenTasks?"#FDF5E6":"transparent",color:"#8B6914",border:"0.5px solid #E8A33D",cursor:"pointer",fontWeight:500}}>
+                {showHiddenTasks?"Hide hidden":"Show hidden"} ({hiddenCount})
+              </button>
+            )}
+            <button onClick={()=>setShowAddTask(p=>!p)} style={{marginLeft:"auto",fontSize:11,padding:"3px 10px",borderRadius:10,background:showAddTask?"#E6F1FB":"transparent",color:"#185FA5",border:"0.5px solid #185FA5",cursor:"pointer",fontWeight:500}}>
+              {showAddTask?"Cancel":"+ Add custom task"}
+            </button>
+          </div>
+
+          {showAddTask&&(
+            <div style={{border:"1px solid #185FA5",borderRadius:"var(--border-radius-lg)",padding:"12px 14px",marginBottom:10,background:"#F5F9FD"}}>
+              <div style={{fontSize:12,fontWeight:500,color:"#185FA5",marginBottom:10}}>Add a custom task unique to your event</div>
+              <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1.5fr",gap:8,marginBottom:8}}>
+                <div>
+                  <label style={{fontSize:10,color:"var(--color-text-secondary)",display:"block",marginBottom:3}}>Task name *</label>
+                  <input value={newTask.name} onChange={e=>setNewTask(p=>({...p,name:e.target.value}))} placeholder="e.g. Coordinate VIP hotel gifts" style={{width:"100%",boxSizing:"border-box",fontSize:12,padding:"5px 8px"}}/>
+                </div>
+                <div>
+                  <label style={{fontSize:10,color:"var(--color-text-secondary)",display:"block",marginBottom:3}}>Days before event *</label>
+                  <input type="number" value={newTask.daysOut} onChange={e=>setNewTask(p=>({...p,daysOut:e.target.value}))} placeholder="e.g. 14" style={{width:"100%",boxSizing:"border-box",fontSize:12,padding:"5px 8px"}}/>
+                </div>
+                <div>
+                  <label style={{fontSize:10,color:"var(--color-text-secondary)",display:"block",marginBottom:3}}>Phase</label>
+                  <select value={newTask.phase} onChange={e=>setNewTask(p=>({...p,phase:e.target.value}))} style={{width:"100%",fontSize:12,padding:"5px 8px"}}>
+                    {Object.keys(PHASE_META).map(p=><option key={p} value={p}>{p}: {PHASE_META[p].label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{fontSize:10,color:"var(--color-text-secondary)",display:"block",marginBottom:3}}>Cluster</label>
+                  <select value={newTask.cluster} onChange={e=>setNewTask(p=>({...p,cluster:e.target.value}))} style={{width:"100%",fontSize:12,padding:"5px 8px"}}>
+                    {CLUSTERS.filter(c=>c!=="All").map(c=><option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                <button onClick={saveCustomTask} disabled={!newTask.name.trim()||newTask.daysOut===""} style={{fontSize:12,padding:"5px 14px",fontWeight:500,background:newTask.name.trim()&&newTask.daysOut!==""?"#185FA5":undefined,color:newTask.name.trim()&&newTask.daysOut!==""?"#fff":undefined,border:"none",borderRadius:"var(--border-radius-md)",cursor:newTask.name.trim()&&newTask.daysOut!==""?"pointer":"not-allowed",opacity:newTask.name.trim()&&newTask.daysOut!==""?1:0.4}}>
+                  Add to shot clock
+                </button>
+                <div style={{fontSize:10,color:"var(--color-text-secondary)",lineHeight:1.4}}>Positive days = before event · Negative days = after event (e.g. -7 for post-event task)</div>
+              </div>
+            </div>
+          )}
+
+          <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            {filtered.map(t=>{
+              const s2=getStatus(t.diff,t.daysOut); const ss=statusStyle(s2); const isOpen=expandedTask[t.id];
+              const isPreDecisionTask = goNoGoEnabled && goNoGoDateObj && t.dueDateObj && t.dueDateObj <= goNoGoDateObj && t.daysOut > 0;
+              const isHidden = hiddenTasks[t.id];
+              const isTaskMenuOpen = menuOpenTask === t.id;
+              return(<div key={t.id} style={{border:`0.5px solid ${isHidden?"#E8A33D":isPreDecisionTask?"#E8C4C4":"var(--color-border-tertiary)"}`,borderRadius:"var(--border-radius-md)",overflow:"hidden",background:isHidden?"#FDF5E6":isPreDecisionTask?"#FEF8F8":undefined,opacity:isHidden?0.7:1}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px"}}>
+                  <span style={{fontSize:10,fontWeight:500,padding:"2px 6px",borderRadius:4,background:PHASE_META[t.phase]?.color+"22",color:PHASE_META[t.phase]?.color,whiteSpace:"nowrap"}}>{t.phase}</span>
+                  <span onClick={()=>!isHidden&&setExpandedTask(p=>({...p,[t.id]:!p[t.id]}))} style={{flex:1,fontSize:12,cursor:isHidden?"default":"pointer",textDecoration:isHidden?"line-through":"none"}}>{t.item}</span>
+                  {isHidden&&<span style={{fontSize:9,fontWeight:500,padding:"1px 6px",borderRadius:3,background:"#FDF5E6",color:"#8B6914",border:"0.5px solid #E8A33D",textTransform:"uppercase",letterSpacing:"0.5px",whiteSpace:"nowrap"}}>Hidden</span>}
+                  {t.isEdited&&!isHidden&&<span title="Task customised by FM" style={{fontSize:9,fontWeight:500,padding:"1px 6px",borderRadius:3,background:"#E1F5EE",color:"#0F6E56",border:"0.5px solid #0F6E56",whiteSpace:"nowrap"}}>✏️ Edited</span>}
+                  {t.isCustom&&!isHidden&&<span title="Custom task added by FM" style={{fontSize:9,fontWeight:500,padding:"1px 6px",borderRadius:3,background:"#E6F1FB",color:"#185FA5",border:"0.5px solid #185FA5",whiteSpace:"nowrap"}}>✏️ Custom</span>}
+                  {isPreDecisionTask&&!isHidden&&<span title="Must be complete before Go/No-Go decision" style={{fontSize:9,fontWeight:500,padding:"1px 6px",borderRadius:3,background:"#FBEAEA",color:"#8B1A1A",border:"0.5px solid #E8C4C4",whiteSpace:"nowrap"}}>⚑ Pre-decision</span>}
+                  <span style={{fontSize:10,color:CLUSTER_COLOR[t.cluster]||"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{t.cluster}</span>
+                  <span style={{fontSize:11,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{t.due}</span>
+                  <span style={{fontSize:10,padding:"2px 7px",borderRadius:4,background:ss.bg,color:ss.text,whiteSpace:"nowrap"}}>{ss.label}</span>
+                  <div style={{position:"relative"}}>
+                    <button onClick={(e)=>{e.stopPropagation();setMenuOpenTask(isTaskMenuOpen?null:t.id);}} aria-label="More options" style={{width:22,height:22,border:"none",background:"transparent",cursor:"pointer",borderRadius:3,color:"var(--color-text-secondary)",fontSize:15,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center"}}>⋯</button>
+                    {isTaskMenuOpen&&(
+                      <div style={{position:"absolute",right:0,top:24,zIndex:10,minWidth:220,background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-secondary)",borderRadius:"var(--border-radius-md)",boxShadow:"0 4px 12px rgba(0,0,0,0.1)",padding:4}}>
+                        {!isHidden&&(
+                          <button onClick={()=>{setEditingTask(t.id);setEditForm({name:t.item,daysOut:String(t.daysOut)});setMenuOpenTask(null);}} style={{width:"100%",textAlign:"left",padding:"7px 10px",border:"none",background:"transparent",fontSize:12,cursor:"pointer",borderRadius:3,color:"var(--color-text-primary)"}}>
+                            ✏️ Edit this task
+                          </button>
+                        )}
+                        {t.isEdited&&!isHidden&&(
+                          <button onClick={()=>{setTaskEdits(p=>{const n={...p};delete n[t.id];return n;});setMenuOpenTask(null);}} style={{width:"100%",textAlign:"left",padding:"7px 10px",border:"none",background:"transparent",fontSize:12,cursor:"pointer",borderRadius:3,color:"var(--color-text-primary)"}}>
+                            ↺ Reset to original
+                          </button>
+                        )}
+                        <button onClick={()=>toggleHideTask(t.id)} style={{width:"100%",textAlign:"left",padding:"7px 10px",border:"none",background:"transparent",fontSize:12,cursor:"pointer",borderRadius:3,color:"var(--color-text-primary)",borderTop:isHidden?"none":"0.5px solid var(--color-border-tertiary)"}}>
+                          {isHidden?"↩ Restore this task":"⊘ Hide this task"}
+                        </button>
+                        <div style={{fontSize:10,color:"var(--color-text-secondary)",padding:"4px 10px 6px",lineHeight:1.4}}>
+                          {isHidden?"Restores for this event only.":"Edits and hides apply to this event only. Template preserved."}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <span onClick={()=>!isHidden&&setExpandedTask(p=>({...p,[t.id]:!p[t.id]}))} style={{fontSize:11,color:"var(--color-text-tertiary)",cursor:isHidden?"default":"pointer"}}>{isOpen&&!isHidden?"▲":"▼"}</span>
+                </div>
+                {editingTask===t.id&&(
+                  <div style={{borderTop:"0.5px solid #0F6E56",padding:"10px 12px",background:"#E1F5EE",display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}>
+                    <div style={{flex:2,minWidth:200}}>
+                      <label style={{fontSize:10,color:"#0F6E56",display:"block",marginBottom:3,fontWeight:500}}>Task name</label>
+                      <input value={editForm.name} onChange={ev=>setEditForm(p=>({...p,name:ev.target.value}))} style={{width:"100%",boxSizing:"border-box",fontSize:12,padding:"5px 8px"}}/>
+                    </div>
+                    <div style={{width:120}}>
+                      <label style={{fontSize:10,color:"#0F6E56",display:"block",marginBottom:3,fontWeight:500}}>Days before event</label>
+                      <input type="number" value={editForm.daysOut} onChange={ev=>setEditForm(p=>({...p,daysOut:ev.target.value}))} style={{width:"100%",boxSizing:"border-box",fontSize:12,padding:"5px 8px"}}/>
+                    </div>
+                    <div style={{display:"flex",gap:6}}>
+                      <button onClick={()=>{if(!editForm.name.trim()||editForm.daysOut==="")return;setTaskEdits(p=>({...p,[t.id]:{item:editForm.name.trim(),daysOut:parseInt(editForm.daysOut)}}));setEditingTask(null);}} style={{fontSize:12,padding:"5px 14px",fontWeight:500,background:"#0F6E56",color:"#fff",border:"none",borderRadius:"var(--border-radius-md)",cursor:"pointer"}}>Save</button>
+                      <button onClick={()=>setEditingTask(null)} style={{fontSize:12,padding:"5px 12px"}}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+                {isOpen&&!isHidden&&(
+                  <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",padding:"8px 12px",background:"var(--color-background-secondary)"}}>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+                      {[{key:"draft",label:"Draft brief ↗"},{key:"raci",label:"Get RACI ↗"},{key:"email",label:"Draft email ↗"}].map(a=>{
+                        const k=`${t.id}-${a.key}`;
+                        return(<button key={a.key} onClick={()=>callAgent(t.id,t.item,a.key)} disabled={taskLoading[k]} style={{fontSize:11,padding:"3px 10px"}}>{taskLoading[k]?"...":a.label}</button>);
+                      })}
+                    </div>
+                    {["draft","raci","email"].map(type=>{const k=`${t.id}-${type}`;if(!taskOutputs[k]) return null;return(<div key={type} style={{marginTop:6,fontSize:12,whiteSpace:"pre-wrap",lineHeight:1.7,borderLeft:"2px solid var(--color-border-secondary)",paddingLeft:10}}><div style={{fontSize:10,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>{type==="draft"?"action brief":type==="raci"?"raci":"email draft"}</div>{taskOutputs[k]}</div>);})}
+                  </div>
+                )}
+              </div>);
+            })}
+          </div>
+        </React.Fragment>
+      )}
+
+      {!generated&&(
+        <div style={{textAlign:"center",padding:"2rem 0",color:"var(--color-text-secondary)",fontSize:12}}>
+          Enter your event name and date above then hit Generate shot clock
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
