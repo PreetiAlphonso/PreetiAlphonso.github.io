@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FMMC — Engine 03: Deliverables Mapper</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --color-text-primary: #1a1a17;
+    --color-text-secondary: #6b6a64;
+    --color-text-tertiary: #9b9a93;
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f5f4ef;
+    --color-background-info: #e6f1fb;
+    --color-text-info: #185fa5;
+    --color-border-info: #185fa5;
+    --color-border-secondary: #c9c7bd;
+    --color-border-tertiary: #e0ded6;
+    --border-radius-md: 6px;
+    --border-radius-lg: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--color-background-primary); font-family: var(--font-sans); }
+  button { border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); border-radius: var(--border-radius-md); cursor: pointer; font-family: inherit; color: var(--color-text-primary); }
+  input, select, textarea { border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); padding: 6px 8px; font-family: inherit; font-size: 13px; color: var(--color-text-primary); background: var(--color-background-primary); }
+  table { border-collapse: collapse; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+
+/* FMMC house palette — consistent with Engine 02 (Shot Clock) */
+const STATE_STYLE = {
+  keep: { color: "#0F6E56", bg: "#E1F5EE", border: "#0F6E5640", glyph: "\u2713", label: "Keep" },
+  skip: { color: "#9A9A93", bg: "transparent", border: "var(--color-border-tertiary)", glyph: "\u2715", label: "Skip" },
+};
+const NEXT_STATE = { keep: "skip", skip: "keep" };
+
+const SEED_CITIES = [
+  { id: "c1", name: "City 1" },
+  { id: "c2", name: "City 2" },
+  { id: "vir", name: "Virtual" },
+];
+
+const SEED_WAVES = [
+  { id: "std", name: "Save the Date", scope: "shared" },
+  { id: "inv", name: "Invite", scope: "split" },
+  { id: "b1", name: "Booster 1", scope: "split" },
+  { id: "b2", name: "Booster 2", scope: "split" },
+  { id: "rem", name: "Reminder", scope: "split" },
+  { id: "ty", name: "Thank You", scope: "shared" },
+  { id: "swm", name: "Sorry We Missed You", scope: "shared" },
+];
+
+const SEED_SUPPORTING = [
+  "PPT One-Slide \u2014 Sales", "PPT One-Slide \u2014 Marketing", "Social / LinkedIn post",
+  "Electronic Signature", "Tracking links (UTMs)", "VIP Codes", "Promotional Video",
+].map((n, i) => ({ id: "s" + i, name: n, state: "keep" }));
+
+const GLOBAL_KEY = "__global__";
+const cellKey = (w, t) => w + ":" + t;
+
+function App() {
+  const [eventName, setEventName] = useState("");
+  const [cities, setCities] = useState(SEED_CITIES);
+  const [waves, setWaves] = useState(SEED_WAVES);
+  const [supporting, setSupporting] = useState(SEED_SUPPORTING);
+  const [cellState, setCellState] = useState({});
+  const [citySkipped, setCitySkipped] = useState({});
+  const [landingKept, setLandingKept] = useState(true);
+  const [adder, setAdder] = useState(null);     // "wave" | "city" | "support" | null
+  const [draft, setDraft] = useState("");
+
+  const resetAll = () => {
+    setEventName("");
+    setCities(SEED_CITIES);
+    setWaves(SEED_WAVES);
+    setSupporting(SEED_SUPPORTING);
+    setCellState({});
+    setCitySkipped({});
+    setLandingKept(true);
+    setAdder(null);
+    setDraft("");
+  };
+
+  const getState = key => cellState[key] || "keep";
+  const cycle = key => setCellState(p => ({ ...p, [key]: NEXT_STATE[getState(key)] }));
+
+  /* ---- derived counts ---- */
+  const isCityOn = id => !citySkipped[id];
+  const emailCeiling = cities.length * waves.length;
+  let emails = 0, savedGlobal = 0, savedSkippedEmail = 0;
+
+  waves.forEach(w => {
+    if (w.scope === "shared") {
+      const s = getState(cellKey(w.id, GLOBAL_KEY));
+      if (s !== "skip") emails += 1; else savedSkippedEmail += 1;
+      savedGlobal += cities.length - 1; // shared wave built once instead of per city
+    } else {
+      cities.forEach(t => {
+        const off = !isCityOn(t.id);
+        const s = getState(cellKey(w.id, t.id));
+        if (!off && s !== "skip") emails += 1; else savedSkippedEmail += 1;
+      });
+    }
+  });
+
+  const supportKept = supporting.filter(s => s.state !== "skip").length;
+  const supportSkipped = supporting.length - supportKept;
+
+  const universe = emailCeiling + supporting.length + 1; // +1 landing page
+  const buildTotal = emails + supportKept + (landingKept ? 1 : 0);
+  const collapsed = universe - buildTotal;
+  const savedSkipped = savedSkippedEmail + supportSkipped + (landingKept ? 0 : 1);
+
+  /* ---- mutations ---- */
+  const renameCity = (id, name) => setCities(p => p.map(t => t.id === id ? { ...t, name } : t));
+  const removeCity = id => setCities(p => p.length > 1 ? p.filter(t => t.id !== id) : p);
+  const toggleCitySkip = id => setCitySkipped(p => ({ ...p, [id]: !p[id] }));
+  const toggleWaveScope = id => setWaves(p => p.map(w => w.id === id ? { ...w, scope: w.scope === "shared" ? "split" : "shared" } : w));
+  const toggleSupport = id => setSupporting(p => p.map(s => s.id === id ? { ...s, state: s.state === "skip" ? "keep" : "skip" } : s));
+
+  const commitAdd = () => {
+    const v = draft.trim();
+    if (!v) { setAdder(null); return; }
+    const id = "x" + Date.now();
+    if (adder === "wave") setWaves(p => [...p, { id, name: v, scope: "split" }]);
+    if (adder === "city") setCities(p => [...p, { id, name: v }]);
+    if (adder === "support") setSupporting(p => [...p, { id, name: v, state: "keep" }]);
+    setDraft(""); setAdder(null);
+  };
+
+  const st = { fontFamily: "var(--font-sans)", color: "var(--color-text-primary)", fontSize: 14 };
+  const pill = (bg, color) => ({ fontSize: 10, fontWeight: 500, padding: "1px 7px", borderRadius: 8, background: bg, color });
+
+  return (
+    <div style={{ ...st, padding: "1.25rem 1rem", maxWidth: 940, margin: "0 auto" }}>
+      {/* Header */}
+      <div style={{ marginBottom: "1rem" }}>
+        <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: "1px", textTransform: "uppercase", color: "var(--color-text-secondary)", marginBottom: 3 }}>FMMC · Field Marketing Mission Control</div>
+        <h2 style={{ fontSize: 20, fontWeight: 500, margin: "0 0 2px" }}>Engine 03 — Deliverables Mapper</h2>
+        <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: "0 0 10px" }}>Land your scope before you build. Identify every asset you'll need before you make the ask from the marketing matrix — come prepared, and move faster together.</p>
+        <div style={{ fontSize: 12, color: "#185FA5", background: "#E6F1FB", border: "0.5px solid #185FA540", borderRadius: "var(--border-radius-md)", padding: "8px 12px", marginBottom: 10 }}>
+          This grid opens as a suggestion, not a mandate — the final number is yours.
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <label style={{ fontSize: 11, color: "var(--color-text-secondary)", flexShrink: 0 }}>Name your event</label>
+          <input value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Regional Security Summit"
+            style={{ fontSize: 13, padding: "6px 10px", flex: 1, minWidth: 180, maxWidth: 320 }} />
+          <button onClick={resetAll} title="Clear everything and start from the default grid"
+            style={{ fontSize: 12, padding: "6px 12px", border: "0.5px solid var(--color-border-secondary)", background: "transparent", color: "var(--color-text-secondary)", borderRadius: "var(--border-radius-md)", cursor: "pointer", flexShrink: 0 }}>↺ Reset</button>
+        </div>
+      </div>
+
+      {/* Hero count */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: "1.25rem" }}>
+        <div style={{ flex: "1 1 180px", padding: "14px 16px", borderRadius: "var(--border-radius-lg)", background: "#EEEDFE", border: "0.5px solid #534AB740" }}>
+          <div style={{ fontSize: 11, color: "#534AB7", marginBottom: 4 }}>Universe (everything possible)</div>
+          <div style={{ fontSize: 30, fontWeight: 500, color: "#534AB7", lineHeight: 1 }}>{universe}</div>
+          <div style={{ fontSize: 10, color: "#26215C", opacity: 0.7, marginTop: 4 }}>every city × every wave, plus supporting</div>
+        </div>
+        <div style={{ flex: "1 1 180px", padding: "14px 16px", borderRadius: "var(--border-radius-lg)", background: "#E1F5EE", border: "0.5px solid #0F6E5640" }}>
+          <div style={{ fontSize: 11, color: "#0F6E56", marginBottom: 4 }}>Build list{eventName ? " \u00b7 " + eventName : ""}</div>
+          <div style={{ fontSize: 30, fontWeight: 500, color: "#0F6E56", lineHeight: 1 }}>{buildTotal}</div>
+          <div style={{ fontSize: 10, color: "#04342C", opacity: 0.75, marginTop: 4 }}>{emails} emails + {supportKept} supporting</div>
+        </div>
+        <div style={{ flex: "2 1 260px", padding: "14px 16px", borderRadius: "var(--border-radius-lg)", background: "var(--color-background-secondary)", border: "0.5px solid var(--color-border-tertiary)" }}>
+          <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginBottom: 6 }}>{collapsed} assets collapsed — the gap you take to the room</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11 }}>
+            <span><strong style={{ fontWeight: 500, color: "#185FA5" }}>{savedGlobal}</strong> from shared waves (one asset, not one per city)</span>
+            <span><strong style={{ fontWeight: 500, color: "#185FA5" }}>{savedSkipped}</strong> skipped by you</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 10, fontSize: 11, color: "var(--color-text-secondary)" }}>
+        {Object.keys(STATE_STYLE).map(k => {
+          const v = STATE_STYLE[k];
+          return (
+            <span key={k} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 16, height: 16, borderRadius: 4, background: v.bg, border: "0.5px solid " + v.border, color: v.color, fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center" }}>{v.glyph}</span>
+              {v.label}
+            </span>
+          );
+        })}
+        <span style={{ marginLeft: "auto", fontStyle: "italic" }}>Email cells are placeholders — copy is written by corporate. Live generation comes in a later version.</span>
+      </div>
+
+      {/* Grid */}
+      <div style={{ overflowX: "auto", border: "0.5px solid var(--color-border-tertiary)", borderRadius: "var(--border-radius-lg)", marginBottom: "1.25rem" }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 560 }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left", padding: "10px 12px", fontSize: 11, fontWeight: 500, color: "var(--color-text-secondary)", borderBottom: "0.5px solid var(--color-border-tertiary)", position: "sticky", left: 0, background: "var(--color-background-primary)", minWidth: 150 }}>Wave</th>
+              {cities.map(t => {
+                const off = !isCityOn(t.id);
+                return (
+                  <th key={t.id} style={{ padding: "8px 10px", borderBottom: "0.5px solid var(--color-border-tertiary)", minWidth: 100, opacity: off ? 0.5 : 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 2, justifyContent: "center" }}>
+                      <input value={t.name} onChange={e => renameCity(t.id, e.target.value)} title="Rename city"
+                        style={{ fontSize: 12, fontWeight: 500, textAlign: "center", width: 66, padding: "2px 4px", border: "0.5px solid transparent", borderRadius: 4, background: "transparent", color: "var(--color-text-primary)", textDecoration: off ? "line-through" : "none" }}
+                        onFocus={e => e.target.style.border = "0.5px solid var(--color-border-secondary)"}
+                        onBlur={e => e.target.style.border = "0.5px solid transparent"} />
+                      <button onClick={() => removeCity(t.id)} title="Delete city permanently"
+                        style={{ border: "none", background: "transparent", color: "var(--color-text-secondary)", cursor: "pointer", fontSize: 12, lineHeight: 1, padding: 2 }}>×</button>
+                    </div>
+                    <button onClick={() => toggleCitySkip(t.id)} title={off ? "Restore this city" : "Skip this city (reversible)"}
+                      style={{ marginTop: 3, ...pill(off ? "#E1F5EE" : "var(--color-background-secondary)", off ? "#0F6E56" : "var(--color-text-secondary)"), border: "none", cursor: "pointer" }}>
+                      {off ? "restore" : "skip"}
+                    </button>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={{ padding: "8px 12px", borderBottom: "0.5px solid var(--color-border-tertiary)", position: "sticky", left: 0, background: "var(--color-background-primary)" }}>
+                <div style={{ fontSize: 12, fontWeight: 500 }}>Landing Page</div>
+                <div style={{ ...pill("#FAEEDA", "#854F0B"), display: "inline-block", marginTop: 3 }}>the destination</div>
+              </td>
+              <td colSpan={cities.length} style={{ padding: 6, borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
+                <div onClick={() => setLandingKept(p => !p)} style={{ cursor: "pointer", textAlign: "center", padding: "8px 10px", borderRadius: "var(--border-radius-md)", background: landingKept ? "#E1F5EE" : "transparent", border: "0.5px dashed " + (landingKept ? "#0F6E5640" : "var(--color-border-tertiary)"), color: landingKept ? "#0F6E56" : "#9A9A93", fontSize: 11, fontWeight: 500 }}>
+                  {landingKept ? "\u2713 one page \u2014 every email drives here" : "\u2715 skipped"}
+                </div>
+              </td>
+            </tr>
+            {waves.map(w => (
+              <tr key={w.id}>
+                <td style={{ padding: "8px 12px", borderBottom: "0.5px solid var(--color-border-tertiary)", position: "sticky", left: 0, background: "var(--color-background-primary)" }}>
+                  <div style={{ fontSize: 12, fontWeight: 500 }}>{w.name}</div>
+                  <button onClick={() => toggleWaveScope(w.id)} title="Switch shared / split"
+                    style={{ marginTop: 3, ...pill(w.scope === "shared" ? "#E6F1FB" : "var(--color-background-secondary)", w.scope === "shared" ? "#185FA5" : "var(--color-text-secondary)"), border: "none", cursor: "pointer" }}>
+                    {w.scope === "shared" ? "shared \u00b7 one for all" : "split \u00b7 per city"}
+                  </button>
+                </td>
+                {w.scope === "shared" ? (
+                  <td colSpan={cities.length} style={{ padding: 6, borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
+                    {(() => {
+                      const key = cellKey(w.id, GLOBAL_KEY);
+                      const s = STATE_STYLE[getState(key)];
+                      return (
+                        <div onClick={() => cycle(key)} style={{ cursor: "pointer", textAlign: "center", padding: "8px 10px", borderRadius: "var(--border-radius-md)", background: s.bg, border: "0.5px dashed " + s.border, color: s.color, fontSize: 11, fontWeight: 500 }}>
+                          {s.glyph} one shared asset — same for every city
+                        </div>
+                      );
+                    })()}
+                  </td>
+                ) : (
+                  cities.map(t => {
+                    const off = !isCityOn(t.id);
+                    const key = cellKey(w.id, t.id);
+                    const s = STATE_STYLE[off ? "skip" : getState(key)];
+                    return (
+                      <td key={t.id} style={{ padding: 6, borderBottom: "0.5px solid var(--color-border-tertiary)", opacity: off ? 0.4 : 1 }}>
+                        <div onClick={() => { if (!off) cycle(key); }} style={{ cursor: off ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", height: 30, borderRadius: "var(--border-radius-md)", background: s.bg, border: "0.5px solid " + s.border, color: s.color, fontSize: 12, fontWeight: 500 }}>
+                          {s.glyph}
+                        </div>
+                      </td>
+                    );
+                  })
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Add wave / city */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: "1.5rem" }}>
+        {adder === "wave" || adder === "city" ? (
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input autoFocus value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") commitAdd(); }}
+              placeholder={adder === "wave" ? "New wave name\u2026" : "New city name\u2026"} style={{ fontSize: 12, padding: "6px 10px" }} />
+            <button onClick={commitAdd} style={{ fontSize: 12, padding: "6px 12px", background: "#185FA5", color: "#fff", border: "none", borderRadius: "var(--border-radius-md)", cursor: "pointer", fontWeight: 500 }}>Add</button>
+            <button onClick={() => { setAdder(null); setDraft(""); }} style={{ fontSize: 12, padding: "6px 12px" }}>Cancel</button>
+          </div>
+        ) : (
+          <React.Fragment>
+            <button onClick={() => setAdder("wave")} style={{ fontSize: 12, padding: "6px 12px" }}>+ Add wave</button>
+            <button onClick={() => setAdder("city")} style={{ fontSize: 12, padding: "6px 12px" }}>+ Add city</button>
+          </React.Fragment>
+        )}
+      </div>
+
+      {/* Supporting assets */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+        <div>
+          <span style={{ fontSize: 13, fontWeight: 500 }}>Supporting assets</span>
+          <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 8 }}>counted, not copy-generated — {supportKept} of {supporting.length} kept</span>
+        </div>
+        {adder !== "support" && <button onClick={() => setAdder("support")} style={{ fontSize: 12, padding: "6px 12px" }}>+ Add</button>}
+      </div>
+      {adder === "support" && (
+        <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+          <input autoFocus value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") commitAdd(); }}
+            placeholder="New supporting asset\u2026" style={{ fontSize: 12, padding: "6px 10px", flex: 1, maxWidth: 280 }} />
+          <button onClick={commitAdd} style={{ fontSize: 12, padding: "6px 12px", background: "#185FA5", color: "#fff", border: "none", borderRadius: "var(--border-radius-md)", cursor: "pointer", fontWeight: 500 }}>Add</button>
+          <button onClick={() => { setAdder(null); setDraft(""); }} style={{ fontSize: 12, padding: "6px 12px" }}>Cancel</button>
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 8 }}>
+        {supporting.map(s => {
+          const kept = s.state !== "skip";
+          return (
+            <div key={s.id} onClick={() => toggleSupport(s.id)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 8, padding: "9px 11px", borderRadius: "var(--border-radius-md)", border: "0.5px solid " + (kept ? "#0F6E5640" : "var(--color-border-tertiary)"), background: kept ? "#E1F5EE" : "var(--color-background-primary)" }}>
+              <span style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0, border: "0.5px solid " + (kept ? "#0F6E56" : "var(--color-border-secondary)"), background: kept ? "#0F6E56" : "transparent", color: "#fff", fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center" }}>{kept ? "\u2713" : ""}</span>
+              <span style={{ fontSize: 11, color: kept ? "#04342C" : "var(--color-text-secondary)", textDecoration: kept ? "none" : "line-through" }}>{s.name}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ marginTop: "1.5rem", paddingTop: 12, borderTop: "0.5px solid var(--color-border-tertiary)", fontSize: 11, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
+        How to prune: a wave set to <strong style={{ fontWeight: 500 }}>shared</strong> is one asset for every city; <strong style={{ fontWeight: 500 }}>split</strong> it when Creative wants a different asset per city. Skip any email or supporting asset you don't need. Add cities or waves for a roadshow. The calculator shows the gap between everything possible and what you'll actually ask for.
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
