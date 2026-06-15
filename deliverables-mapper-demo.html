@@ -36,11 +36,8 @@
 const { useState } = React;
 
 /* FMMC house palette — consistent with Engine 02 (Shot Clock) */
-const STATE_STYLE = {
-  keep: { color: "#0F6E56", bg: "#E1F5EE", border: "#0F6E5640", glyph: "\u2713", label: "Keep" },
-  skip: { color: "#9A9A93", bg: "transparent", border: "var(--color-border-tertiary)", glyph: "\u2715", label: "Skip" },
-};
-const NEXT_STATE = { keep: "skip", skip: "keep" };
+const KEEP = { color: "#0F6E56", bg: "#E1F5EE", border: "#0F6E5640", glyph: "✓" };
+const SKIP = { color: "#9A9A93", bg: "transparent", border: "var(--color-border-tertiary)", glyph: "✕" };
 
 const SEED_CITIES = [
   { id: "c1", name: "City 1" },
@@ -48,91 +45,86 @@ const SEED_CITIES = [
   { id: "vir", name: "Virtual" },
 ];
 
-const SEED_WAVES = [
-  { id: "std", name: "Save the Date", scope: "shared" },
-  { id: "inv", name: "Invite", scope: "split" },
-  { id: "b1", name: "Booster 1", scope: "split" },
-  { id: "b2", name: "Booster 2", scope: "split" },
-  { id: "rem", name: "Reminder", scope: "split" },
-  { id: "ty", name: "Thank You", scope: "shared" },
-  { id: "swm", name: "Sorry We Missed You", scope: "shared" },
+// One unified list of deliverables. scope: "perCity" (one per city) or "oneTime" (one build covers all).
+const SEED_DELIVERABLES = [
+  { id: "landing", name: "Landing Page", scope: "oneTime" },
+  { id: "std", name: "Save the Date", scope: "oneTime" },
+  { id: "inv", name: "Invite", scope: "perCity" },
+  { id: "b1", name: "Booster 1", scope: "perCity" },
+  { id: "b2", name: "Booster 2", scope: "perCity" },
+  { id: "rem", name: "Reminder", scope: "perCity" },
+  { id: "ty", name: "Thank You", scope: "oneTime" },
+  { id: "swm", name: "Sorry We Missed You", scope: "oneTime" },
+  { id: "ppt_s", name: "PPT One-Slide — Sales", scope: "oneTime" },
+  { id: "ppt_m", name: "PPT One-Slide — Marketing", scope: "oneTime" },
+  { id: "social", name: "Social / LinkedIn post", scope: "oneTime" },
+  { id: "esig", name: "Electronic Signature", scope: "oneTime" },
+  { id: "utm", name: "Tracking links (UTMs)", scope: "oneTime" },
+  { id: "vip", name: "VIP Codes", scope: "oneTime" },
+  { id: "video", name: "Promotional Video", scope: "oneTime" },
 ];
 
-const SEED_SUPPORTING = [
-  "PPT One-Slide \u2014 Sales", "PPT One-Slide \u2014 Marketing", "Social / LinkedIn post",
-  "Electronic Signature", "Tracking links (UTMs)", "VIP Codes", "Promotional Video",
-].map((n, i) => ({ id: "s" + i, name: n, state: "keep" }));
-
-const GLOBAL_KEY = "__global__";
-const cellKey = (w, t) => w + ":" + t;
+const ONE_KEY = "__one__";
+const cellKey = (d, c) => d + ":" + c;
 
 function App() {
   const [eventName, setEventName] = useState("");
   const [cities, setCities] = useState(SEED_CITIES);
-  const [waves, setWaves] = useState(SEED_WAVES);
-  const [supporting, setSupporting] = useState(SEED_SUPPORTING);
-  const [cellState, setCellState] = useState({});
+  const [deliverables, setDeliverables] = useState(SEED_DELIVERABLES);
+  const [cellState, setCellState] = useState({});       // perCity cells + oneTime rows -> "skip" when off
   const [citySkipped, setCitySkipped] = useState({});
-  const [landingKept, setLandingKept] = useState(true);
-  const [adder, setAdder] = useState(null);     // "wave" | "city" | "support" | null
+  const [adder, setAdder] = useState(null);             // "deliverable" | "city" | null
   const [draft, setDraft] = useState("");
 
   const resetAll = () => {
     setEventName("");
     setCities(SEED_CITIES);
-    setWaves(SEED_WAVES);
-    setSupporting(SEED_SUPPORTING);
+    setDeliverables(SEED_DELIVERABLES);
     setCellState({});
     setCitySkipped({});
-    setLandingKept(true);
     setAdder(null);
     setDraft("");
   };
 
   const getState = key => cellState[key] || "keep";
-  const cycle = key => setCellState(p => ({ ...p, [key]: NEXT_STATE[getState(key)] }));
+  const cycle = key => setCellState(p => ({ ...p, [key]: getState(key) === "keep" ? "skip" : "keep" }));
 
-  /* ---- derived counts ---- */
+  /* ---- counts ---- */
   const isCityOn = id => !citySkipped[id];
-  const emailCeiling = cities.length * waves.length;
-  let emails = 0, savedGlobal = 0, savedSkippedEmail = 0;
+  const ceiling = deliverables.length * cities.length; // naive: every deliverable, every city
+  let built = 0, savedOneTime = 0, savedSkipped = 0;
 
-  waves.forEach(w => {
-    if (w.scope === "shared") {
-      const s = getState(cellKey(w.id, GLOBAL_KEY));
-      if (s !== "skip") emails += 1; else savedSkippedEmail += 1;
-      savedGlobal += cities.length - 1; // shared wave built once instead of per city
+  deliverables.forEach(d => {
+    if (d.scope === "oneTime") {
+      const s = getState(cellKey(d.id, ONE_KEY));
+      if (s !== "skip") built += 1; else savedSkipped += 1;
+      savedOneTime += cities.length - 1; // one build instead of one per city
     } else {
-      cities.forEach(t => {
-        const off = !isCityOn(t.id);
-        const s = getState(cellKey(w.id, t.id));
-        if (!off && s !== "skip") emails += 1; else savedSkippedEmail += 1;
+      cities.forEach(c => {
+        const off = !isCityOn(c.id);
+        const s = getState(cellKey(d.id, c.id));
+        if (!off && s !== "skip") built += 1; else savedSkipped += 1;
       });
     }
   });
 
-  const supportKept = supporting.filter(s => s.state !== "skip").length;
-  const supportSkipped = supporting.length - supportKept;
-
-  const universe = emailCeiling + supporting.length + 1; // +1 landing page
-  const buildTotal = emails + supportKept + (landingKept ? 1 : 0);
+  const universe = ceiling;
+  const buildTotal = built;
   const collapsed = universe - buildTotal;
-  const savedSkipped = savedSkippedEmail + supportSkipped + (landingKept ? 0 : 1);
 
   /* ---- mutations ---- */
-  const renameCity = (id, name) => setCities(p => p.map(t => t.id === id ? { ...t, name } : t));
-  const removeCity = id => setCities(p => p.length > 1 ? p.filter(t => t.id !== id) : p);
+  const renameCity = (id, name) => setCities(p => p.map(c => c.id === id ? { ...c, name } : c));
+  const removeCity = id => setCities(p => p.length > 1 ? p.filter(c => c.id !== id) : p);
   const toggleCitySkip = id => setCitySkipped(p => ({ ...p, [id]: !p[id] }));
-  const toggleWaveScope = id => setWaves(p => p.map(w => w.id === id ? { ...w, scope: w.scope === "shared" ? "split" : "shared" } : w));
-  const toggleSupport = id => setSupporting(p => p.map(s => s.id === id ? { ...s, state: s.state === "skip" ? "keep" : "skip" } : s));
+  const toggleScope = id => setDeliverables(p => p.map(d => d.id === id ? { ...d, scope: d.scope === "oneTime" ? "perCity" : "oneTime" } : d));
+  const removeDeliverable = id => setDeliverables(p => p.length > 1 ? p.filter(d => d.id !== id) : p);
 
   const commitAdd = () => {
     const v = draft.trim();
     if (!v) { setAdder(null); return; }
     const id = "x" + Date.now();
-    if (adder === "wave") setWaves(p => [...p, { id, name: v, scope: "split" }]);
+    if (adder === "deliverable") setDeliverables(p => [...p, { id, name: v, scope: "oneTime" }]);
     if (adder === "city") setCities(p => [...p, { id, name: v }]);
-    if (adder === "support") setSupporting(p => [...p, { id, name: v, state: "keep" }]);
     setDraft(""); setAdder(null);
   };
 
@@ -145,7 +137,7 @@ function App() {
       <div style={{ marginBottom: "1rem" }}>
         <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: "1px", textTransform: "uppercase", color: "var(--color-text-secondary)", marginBottom: 3 }}>FMMC · Field Marketing Mission Control</div>
         <h2 style={{ fontSize: 20, fontWeight: 500, margin: "0 0 2px" }}>Engine 03 — Deliverables Mapper</h2>
-        <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: "0 0 10px" }}>Land your scope before you build. Identify every asset you'll need before you make the ask from the marketing matrix — come prepared, and move faster together.</p>
+        <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: "0 0 10px" }}>Land your scope before you build. Identify every deliverable you'll need before you make the ask from the marketing matrix — come prepared, and move faster together.</p>
         <div style={{ fontSize: 12, color: "#185FA5", background: "#E6F1FB", border: "0.5px solid #185FA540", borderRadius: "var(--border-radius-md)", padding: "8px 12px", marginBottom: 10 }}>
           This grid opens as a suggestion, not a mandate — the final number is yours.
         </div>
@@ -163,34 +155,33 @@ function App() {
         <div style={{ flex: "1 1 180px", padding: "14px 16px", borderRadius: "var(--border-radius-lg)", background: "#EEEDFE", border: "0.5px solid #534AB740" }}>
           <div style={{ fontSize: 11, color: "#534AB7", marginBottom: 4 }}>Universe (everything possible)</div>
           <div style={{ fontSize: 30, fontWeight: 500, color: "#534AB7", lineHeight: 1 }}>{universe}</div>
-          <div style={{ fontSize: 10, color: "#26215C", opacity: 0.7, marginTop: 4 }}>every city × every wave, plus supporting</div>
+          <div style={{ fontSize: 10, color: "#26215C", opacity: 0.7, marginTop: 4 }}>every deliverable × every city</div>
         </div>
         <div style={{ flex: "1 1 180px", padding: "14px 16px", borderRadius: "var(--border-radius-lg)", background: "#E1F5EE", border: "0.5px solid #0F6E5640" }}>
-          <div style={{ fontSize: 11, color: "#0F6E56", marginBottom: 4 }}>Build list{eventName ? " \u00b7 " + eventName : ""}</div>
+          <div style={{ fontSize: 11, color: "#0F6E56", marginBottom: 4 }}>Build list{eventName ? " · " + eventName : ""}</div>
           <div style={{ fontSize: 30, fontWeight: 500, color: "#0F6E56", lineHeight: 1 }}>{buildTotal}</div>
-          <div style={{ fontSize: 10, color: "#04342C", opacity: 0.75, marginTop: 4 }}>{emails} emails + {supportKept} supporting</div>
+          <div style={{ fontSize: 10, color: "#04342C", opacity: 0.75, marginTop: 4 }}>what you'll actually request</div>
         </div>
         <div style={{ flex: "2 1 260px", padding: "14px 16px", borderRadius: "var(--border-radius-lg)", background: "var(--color-background-secondary)", border: "0.5px solid var(--color-border-tertiary)" }}>
-          <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginBottom: 6 }}>{collapsed} assets collapsed — the gap you take to the room</div>
+          <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginBottom: 6 }}>{collapsed} collapsed — the gap you take to the room</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11 }}>
-            <span><strong style={{ fontWeight: 500, color: "#185FA5" }}>{savedGlobal}</strong> from shared waves (one asset, not one per city)</span>
+            <span><strong style={{ fontWeight: 500, color: "#185FA5" }}>{savedOneTime}</strong> from shared deliverables (one build, not one per city)</span>
             <span><strong style={{ fontWeight: 500, color: "#185FA5" }}>{savedSkipped}</strong> skipped by you</span>
           </div>
         </div>
       </div>
 
       {/* Legend */}
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 10, fontSize: 11, color: "var(--color-text-secondary)" }}>
-        {Object.keys(STATE_STYLE).map(k => {
-          const v = STATE_STYLE[k];
-          return (
-            <span key={k} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 16, height: 16, borderRadius: 4, background: v.bg, border: "0.5px solid " + v.border, color: v.color, fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center" }}>{v.glyph}</span>
-              {v.label}
-            </span>
-          );
-        })}
-        <span style={{ marginLeft: "auto", fontStyle: "italic" }}>Email cells are placeholders — copy is written by corporate. Live generation comes in a later version.</span>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 10, fontSize: 11, color: "var(--color-text-secondary)", alignItems: "center" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <span style={{ width: 16, height: 16, borderRadius: 4, background: KEEP.bg, border: "0.5px solid " + KEEP.border, color: KEEP.color, fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center" }}>{KEEP.glyph}</span>
+          Keep
+        </span>
+        <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <span style={{ width: 16, height: 16, borderRadius: 4, background: SKIP.bg, border: "0.5px solid " + SKIP.border, color: SKIP.color, fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center" }}>{SKIP.glyph}</span>
+          Skip
+        </span>
+        <span style={{ marginLeft: "auto", fontStyle: "italic" }}>Each row is a deliverable you'll request from another team. You scope it here; they build it.</span>
       </div>
 
       {/* Grid */}
@@ -198,20 +189,20 @@ function App() {
         <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 560 }}>
           <thead>
             <tr>
-              <th style={{ textAlign: "left", padding: "10px 12px", fontSize: 11, fontWeight: 500, color: "var(--color-text-secondary)", borderBottom: "0.5px solid var(--color-border-tertiary)", position: "sticky", left: 0, background: "var(--color-background-primary)", minWidth: 150 }}>Wave</th>
-              {cities.map(t => {
-                const off = !isCityOn(t.id);
+              <th style={{ textAlign: "left", padding: "10px 12px", fontSize: 11, fontWeight: 500, color: "var(--color-text-secondary)", borderBottom: "0.5px solid var(--color-border-tertiary)", position: "sticky", left: 0, background: "var(--color-background-primary)", minWidth: 170 }}>Deliverable</th>
+              {cities.map(c => {
+                const off = !isCityOn(c.id);
                 return (
-                  <th key={t.id} style={{ padding: "8px 10px", borderBottom: "0.5px solid var(--color-border-tertiary)", minWidth: 100, opacity: off ? 0.5 : 1 }}>
+                  <th key={c.id} style={{ padding: "8px 10px", borderBottom: "0.5px solid var(--color-border-tertiary)", minWidth: 100, opacity: off ? 0.5 : 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 2, justifyContent: "center" }}>
-                      <input value={t.name} onChange={e => renameCity(t.id, e.target.value)} title="Rename city"
+                      <input value={c.name} onChange={e => renameCity(c.id, e.target.value)} title="Rename city"
                         style={{ fontSize: 12, fontWeight: 500, textAlign: "center", width: 66, padding: "2px 4px", border: "0.5px solid transparent", borderRadius: 4, background: "transparent", color: "var(--color-text-primary)", textDecoration: off ? "line-through" : "none" }}
                         onFocus={e => e.target.style.border = "0.5px solid var(--color-border-secondary)"}
                         onBlur={e => e.target.style.border = "0.5px solid transparent"} />
-                      <button onClick={() => removeCity(t.id)} title="Delete city permanently"
+                      <button onClick={() => removeCity(c.id)} title="Delete city permanently"
                         style={{ border: "none", background: "transparent", color: "var(--color-text-secondary)", cursor: "pointer", fontSize: 12, lineHeight: 1, padding: 2 }}>×</button>
                     </div>
-                    <button onClick={() => toggleCitySkip(t.id)} title={off ? "Restore this city" : "Skip this city (reversible)"}
+                    <button onClick={() => toggleCitySkip(c.id)} title={off ? "Restore this city" : "Skip this city (reversible)"}
                       style={{ marginTop: 3, ...pill(off ? "#E1F5EE" : "var(--color-background-secondary)", off ? "#0F6E56" : "var(--color-text-secondary)"), border: "none", cursor: "pointer" }}>
                       {off ? "restore" : "skip"}
                     </button>
@@ -221,45 +212,38 @@ function App() {
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td style={{ padding: "8px 12px", borderBottom: "0.5px solid var(--color-border-tertiary)", position: "sticky", left: 0, background: "var(--color-background-primary)" }}>
-                <div style={{ fontSize: 12, fontWeight: 500 }}>Landing Page</div>
-                <div style={{ ...pill("#FAEEDA", "#854F0B"), display: "inline-block", marginTop: 3 }}>the destination</div>
-              </td>
-              <td colSpan={cities.length} style={{ padding: 6, borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
-                <div onClick={() => setLandingKept(p => !p)} style={{ cursor: "pointer", textAlign: "center", padding: "8px 10px", borderRadius: "var(--border-radius-md)", background: landingKept ? "#E1F5EE" : "transparent", border: "0.5px dashed " + (landingKept ? "#0F6E5640" : "var(--color-border-tertiary)"), color: landingKept ? "#0F6E56" : "#9A9A93", fontSize: 11, fontWeight: 500 }}>
-                  {landingKept ? "\u2713 one page \u2014 every email drives here" : "\u2715 skipped"}
-                </div>
-              </td>
-            </tr>
-            {waves.map(w => (
-              <tr key={w.id}>
+            {deliverables.map(d => (
+              <tr key={d.id}>
                 <td style={{ padding: "8px 12px", borderBottom: "0.5px solid var(--color-border-tertiary)", position: "sticky", left: 0, background: "var(--color-background-primary)" }}>
-                  <div style={{ fontSize: 12, fontWeight: 500 }}>{w.name}</div>
-                  <button onClick={() => toggleWaveScope(w.id)} title="Switch shared / split"
-                    style={{ marginTop: 3, ...pill(w.scope === "shared" ? "#E6F1FB" : "var(--color-background-secondary)", w.scope === "shared" ? "#185FA5" : "var(--color-text-secondary)"), border: "none", cursor: "pointer" }}>
-                    {w.scope === "shared" ? "shared \u00b7 one for all" : "split \u00b7 per city"}
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ fontSize: 12, fontWeight: 500 }}>{d.name}</span>
+                    <button onClick={() => removeDeliverable(d.id)} title="Remove this deliverable"
+                      style={{ border: "none", background: "transparent", color: "var(--color-text-secondary)", cursor: "pointer", fontSize: 12, lineHeight: 1, padding: 2 }}>×</button>
+                  </div>
+                  <button onClick={() => toggleScope(d.id)} title="Switch shared / split"
+                    style={{ marginTop: 3, ...pill(d.scope === "oneTime" ? "#E6F1FB" : "var(--color-background-secondary)", d.scope === "oneTime" ? "#185FA5" : "var(--color-text-secondary)"), border: "none", cursor: "pointer" }}>
+                    {d.scope === "oneTime" ? "shared · one for all" : "split · per city"}
                   </button>
                 </td>
-                {w.scope === "shared" ? (
+                {d.scope === "oneTime" ? (
                   <td colSpan={cities.length} style={{ padding: 6, borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
                     {(() => {
-                      const key = cellKey(w.id, GLOBAL_KEY);
-                      const s = STATE_STYLE[getState(key)];
+                      const key = cellKey(d.id, ONE_KEY);
+                      const s = getState(key) === "skip" ? SKIP : KEEP;
                       return (
                         <div onClick={() => cycle(key)} style={{ cursor: "pointer", textAlign: "center", padding: "8px 10px", borderRadius: "var(--border-radius-md)", background: s.bg, border: "0.5px dashed " + s.border, color: s.color, fontSize: 11, fontWeight: 500 }}>
-                          {s.glyph} one shared asset — same for every city
+                          {s.glyph} one build — covers every city
                         </div>
                       );
                     })()}
                   </td>
                 ) : (
-                  cities.map(t => {
-                    const off = !isCityOn(t.id);
-                    const key = cellKey(w.id, t.id);
-                    const s = STATE_STYLE[off ? "skip" : getState(key)];
+                  cities.map(c => {
+                    const off = !isCityOn(c.id);
+                    const key = cellKey(d.id, c.id);
+                    const s = (off || getState(key) === "skip") ? SKIP : KEEP;
                     return (
-                      <td key={t.id} style={{ padding: 6, borderBottom: "0.5px solid var(--color-border-tertiary)", opacity: off ? 0.4 : 1 }}>
+                      <td key={c.id} style={{ padding: 6, borderBottom: "0.5px solid var(--color-border-tertiary)", opacity: off ? 0.4 : 1 }}>
                         <div onClick={() => { if (!off) cycle(key); }} style={{ cursor: off ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", height: 30, borderRadius: "var(--border-radius-md)", background: s.bg, border: "0.5px solid " + s.border, color: s.color, fontSize: 12, fontWeight: 500 }}>
                           {s.glyph}
                         </div>
@@ -273,53 +257,25 @@ function App() {
         </table>
       </div>
 
-      {/* Add wave / city */}
+      {/* Add deliverable / city */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: "1.5rem" }}>
-        {adder === "wave" || adder === "city" ? (
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        {adder === "deliverable" || adder === "city" ? (
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             <input autoFocus value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") commitAdd(); }}
-              placeholder={adder === "wave" ? "New wave name\u2026" : "New city name\u2026"} style={{ fontSize: 12, padding: "6px 10px" }} />
+              placeholder={adder === "deliverable" ? "New deliverable name…" : "New city name…"} style={{ fontSize: 12, padding: "6px 10px" }} />
             <button onClick={commitAdd} style={{ fontSize: 12, padding: "6px 12px", background: "#185FA5", color: "#fff", border: "none", borderRadius: "var(--border-radius-md)", cursor: "pointer", fontWeight: 500 }}>Add</button>
             <button onClick={() => { setAdder(null); setDraft(""); }} style={{ fontSize: 12, padding: "6px 12px" }}>Cancel</button>
           </div>
         ) : (
           <React.Fragment>
-            <button onClick={() => setAdder("wave")} style={{ fontSize: 12, padding: "6px 12px" }}>+ Add wave</button>
+            <button onClick={() => setAdder("deliverable")} style={{ fontSize: 12, padding: "6px 12px" }}>+ Add deliverable</button>
             <button onClick={() => setAdder("city")} style={{ fontSize: 12, padding: "6px 12px" }}>+ Add city</button>
           </React.Fragment>
         )}
       </div>
 
-      {/* Supporting assets */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
-        <div>
-          <span style={{ fontSize: 13, fontWeight: 500 }}>Supporting assets</span>
-          <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 8 }}>counted, not copy-generated — {supportKept} of {supporting.length} kept</span>
-        </div>
-        {adder !== "support" && <button onClick={() => setAdder("support")} style={{ fontSize: 12, padding: "6px 12px" }}>+ Add</button>}
-      </div>
-      {adder === "support" && (
-        <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
-          <input autoFocus value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") commitAdd(); }}
-            placeholder="New supporting asset\u2026" style={{ fontSize: 12, padding: "6px 10px", flex: 1, maxWidth: 280 }} />
-          <button onClick={commitAdd} style={{ fontSize: 12, padding: "6px 12px", background: "#185FA5", color: "#fff", border: "none", borderRadius: "var(--border-radius-md)", cursor: "pointer", fontWeight: 500 }}>Add</button>
-          <button onClick={() => { setAdder(null); setDraft(""); }} style={{ fontSize: 12, padding: "6px 12px" }}>Cancel</button>
-        </div>
-      )}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 8 }}>
-        {supporting.map(s => {
-          const kept = s.state !== "skip";
-          return (
-            <div key={s.id} onClick={() => toggleSupport(s.id)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 8, padding: "9px 11px", borderRadius: "var(--border-radius-md)", border: "0.5px solid " + (kept ? "#0F6E5640" : "var(--color-border-tertiary)"), background: kept ? "#E1F5EE" : "var(--color-background-primary)" }}>
-              <span style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0, border: "0.5px solid " + (kept ? "#0F6E56" : "var(--color-border-secondary)"), background: kept ? "#0F6E56" : "transparent", color: "#fff", fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center" }}>{kept ? "\u2713" : ""}</span>
-              <span style={{ fontSize: 11, color: kept ? "#04342C" : "var(--color-text-secondary)", textDecoration: kept ? "none" : "line-through" }}>{s.name}</span>
-            </div>
-          );
-        })}
-      </div>
-
-      <div style={{ marginTop: "1.5rem", paddingTop: 12, borderTop: "0.5px solid var(--color-border-tertiary)", fontSize: 11, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-        How to prune: a wave set to <strong style={{ fontWeight: 500 }}>shared</strong> is one asset for every city; <strong style={{ fontWeight: 500 }}>split</strong> it when Creative wants a different asset per city. Skip any email or supporting asset you don't need. Add cities or waves for a roadshow. The calculator shows the gap between everything possible and what you'll actually ask for.
+      <div style={{ marginTop: "0.5rem", paddingTop: 12, borderTop: "0.5px solid var(--color-border-tertiary)", fontSize: 11, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
+        How to scope: set each deliverable to <strong style={{ fontWeight: 500 }}>shared</strong> (a single build that covers every city) or <strong style={{ fontWeight: 500 }}>split</strong> (one build for each city). Skip anything you don't need, add cities for a roadshow, or add your own deliverables. The number you land on is exactly what you'll request — nothing more, nothing missed.
       </div>
     </div>
   );
